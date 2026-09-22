@@ -9,9 +9,13 @@ let accuracyCircle = null;
 let forestBoundaryLayer = null;
 let wmsLayer = null;
 let forestTypeGeoJSONLayer = null;  // nakładka GeoJSON typów drzewostanu
+let trailsLayer = null;             // nakładka WMS szlaków turystycznych LP
 let pinMarker = null;        // marker ręcznie wybranego punktu
 let pinModeActive = false;  // czy tryb kliknij-na-mapę jest włączony
 let onMapClickCb = null;    // callback(lat, lng) przy kliknięciu
+
+// Stan nakładki szlaków
+let _showTrails = false;
 
 // Stan nakładek typów lasu
 let _showDeciduous = false;
@@ -251,6 +255,51 @@ function addForestWMSLayer() {
     console.warn('[Map] WMS layer failed:', e);
   }
 }
+
+/**
+ * Utwórz warstwę WMS szlaków turystycznych LP BDL
+ * Warstwy: 18=szlaki turystyczne, 19=ścieżki konne, 20+21=ścieżki dydaktyczne
+ */
+function createTrailsWMSLayer() {
+  return L.tileLayer.wms(WMS_BDL_URL, {
+    layers: '18,19,20,21',
+    format: 'image/png',
+    transparent: true,
+    opacity: 0.85,
+    attribution: '© Lasy Państwowe BDL — Mapa Turystyczna',
+    maxZoom: 19,
+    version: '1.3.0',
+  });
+}
+
+/**
+ * Przełącz widoczność warstwy szlaków turystycznych LP
+ */
+export function toggleTrailsLayer(visible) {
+  _showTrails = visible;
+  if (!map) return;
+
+  if (visible) {
+    if (!trailsLayer) {
+      trailsLayer = createTrailsWMSLayer();
+    }
+    if (!map.hasLayer(trailsLayer)) {
+      trailsLayer.addTo(map);
+    }
+  } else {
+    if (trailsLayer && map.hasLayer(trailsLayer)) {
+      map.removeLayer(trailsLayer);
+    }
+  }
+}
+
+/**
+ * Czy warstwa szlaków jest aktualnie widoczna
+ */
+export function isTrailsVisible() {
+  return _showTrails;
+}
+
 
 /**
  * Zaktualizuj pozycję użytkownika na mapie

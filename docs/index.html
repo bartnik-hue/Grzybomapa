@@ -57,6 +57,9 @@
       <button id="btn-heatmap" class="icon-btn" title="Mapa cieplna warunków grzybobrania" aria-label="Włącz mapę cieplną">
         🌡️
       </button>
+      <button id="btn-trails" class="icon-btn" title="Szlaki turystyczne i ścieżki leśne LP" aria-label="Pokaż szlaki turystyczne">
+        🥾
+      </button>
       <button id="btn-pin-mode" class="icon-btn" title="Próbnik Terenu — postaw lub przesuń pinezkę" aria-label="Próbnik terenu">
         📌
       </button>
@@ -114,6 +117,26 @@
       </div>
     </div>
     <div class="ftl-note">Dane BDL LP · Przybliż mapę (&gt;zoom 11)</div>
+  </div>
+
+  <!-- Legenda szlaków turystycznych LP (ukryta domyślnie) -->
+  <div id="trails-legend" class="trails-legend hidden" aria-label="Legenda szlaków turystycznych">
+    <div class="trails-legend-title">🥾 Szlaki i ścieżki LP</div>
+    <div class="trails-legend-items">
+      <div class="trails-legend-item">
+        <span class="trails-dot trails-dot-hiking"></span>
+        <span>Szlaki turystyczne</span>
+      </div>
+      <div class="trails-legend-item">
+        <span class="trails-dot trails-dot-horse"></span>
+        <span>Ścieżki konne</span>
+      </div>
+      <div class="trails-legend-item">
+        <span class="trails-dot trails-dot-didactic"></span>
+        <span>Ścieżki dydaktyczne</span>
+      </div>
+    </div>
+    <div class="trails-legend-note">Dane BDL LP · Mapa Turystyczna</div>
   </div>
 
   <!-- Backdrop -->

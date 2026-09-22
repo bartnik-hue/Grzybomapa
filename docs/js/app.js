@@ -9,7 +9,7 @@ import { getForestData, getForestBoundary } from './forest_api.js';
 import { getWeatherData, weatherCodeToText, weatherCodeToIcon } from './weather.js';
 import { getMushroomsForStand, getMushroomsForMixedForest, filterBySeason, TREE_SPECIES } from './mushroom_knowledge.js';
 import { scoreAllMushrooms, calculateOverallScore, generateSummary, generateDetailedDiagnosis, edibleLabel, scoreToColor, scoreToLabel } from './scoring.js';
-import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleDeciduousLayer, toggleConiferousLayer } from './map.js';
+import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleDeciduousLayer, toggleConiferousLayer, toggleTrailsLayer, isTrailsVisible } from './map.js';
 import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=4.2';
 
 // ── Stan aplikacji ─────────────────────────────────────────────────
@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-heatmap').addEventListener('click', onHeatmapToggle);
   $('btn-deciduous').addEventListener('click', onDeciduousToggle);
   $('btn-coniferous').addEventListener('click', onConiferousToggle);
+  $('btn-trails').addEventListener('click', onTrailsToggle);
 
   // Sprawdź czy Geolocation jest dostępne
   if (!navigator.geolocation) {
@@ -763,4 +764,14 @@ function onConiferousToggle() {
   toggleConiferousLayer(coniferousVisible);
   $('btn-coniferous').classList.toggle('active-coniferous', coniferousVisible);
   updateForestTypeLegend();
+}
+
+// ── Szlaki turystyczne LP ─────────────────────────────────────────
+let trailsVisible = false;
+
+function onTrailsToggle() {
+  trailsVisible = !trailsVisible;
+  toggleTrailsLayer(trailsVisible);
+  $('btn-trails').classList.toggle('active-trails', trailsVisible);
+  $('trails-legend').classList.toggle('hidden', !trailsVisible);
 }
