@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b1612" />
+  <meta name="description" content="GrzyboMapa – pomocnik zbieracza grzybów. Wykrywa las, gatunek drzew i ocenia warunki do grzybobrania na podstawie pogody." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>GrzyboMapa 🍄 – Pomocnik Zbieracza</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><text y='32' font-size='32'>🍄</text></svg>" />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="css/style.css?v=4.2" />
+</head>
+<body>
+
+<!-- ══ SPLASH ══════════════════════════════════════════════════════ -->
+<div id="splash">
+  <div class="splash-icon">🍄</div>
+  <div class="splash-title">GrzyboMapa</div>
+  <div class="splash-sub">Twój leśny kompas</div>
+  <div class="splash-dots">
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+  </div>
+</div>
+
+<!-- ══ APP ═════════════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- Header -->
+  <header id="header">
+    <div class="header-logo">
+      <span class="logo-icon">🍄</span>
+      <span class="logo-text">GrzyboMapa</span>
+      <span class="logo-badge">BETA</span>
+    </div>
+    <div class="header-actions">
+      <button id="btn-layer-toggle" class="icon-btn active" title="Pokaż/ukryj warstwę drzewostanów" aria-label="Przełącz warstwę leśną">
+        🗺️
+      </button>
+      <button id="btn-heatmap" class="icon-btn" title="Mapa cieplna warunków grzybobrania" aria-label="Włącz mapę cieplną">
+        🌡️
+      </button>
+      <button id="btn-pin-mode" class="icon-btn" title="Próbnik Terenu — postaw lub przesuń pinezkę" aria-label="Próbnik terenu">
+        📌
+      </button>
+      <button id="btn-locate" class="icon-btn" title="Lokalizator GPS na żywo" aria-label="Lokalizuj mnie GPS">
+        🎯
+      </button>
+    </div>
+  </header>
+
+  <!-- Mapa -->
+  <div id="map" role="application" aria-label="Mapa interaktywna"></div>
+
+  <!-- FAB — Pokaż wyniki -->
+  <button id="fab-panel" aria-label="Pokaż wyniki grzybobrania">
+    🍄 Pokaż wyniki
+  </button>
+
+  <!-- Tooltip pinezki (pojawia się nad FAB gdy tryb aktywny) -->
+  <div id="pin-hint" class="pin-hint hidden">
+    👆 Kliknij w dowolne miejsce na mapie
+  </div>
+
+  <!-- Status bar -->
+  <div id="status-bar" role="status" aria-live="polite"></div>
+
+  <!-- Legenda heatmapy (ukryta domyślnie) -->
+  <div id="heatmap-legend" class="heatmap-legend hidden" aria-label="Legenda mapy cieplnej">
+    <div class="heatmap-legend-title">🌡️ Warunki grzybobrania</div>
+    <div class="heatmap-gradient-bar">
+      <span class="heatmap-label-lo">Niekorzystne</span>
+      <div class="heatmap-gradient"></div>
+      <span class="heatmap-label-hi">Idealne</span>
+    </div>
+    <div class="heatmap-legend-note">
+      Teren × Pogoda × Sezon &middot; <span id="heatmap-status">ustaw lokalizację aby aktywować</span>
+    </div>
+    <div id="heatmap-loading" class="heatmap-loading-bar hidden"></div>
+  </div>
+
+  <!-- Backdrop -->
+  <div id="panel-backdrop" role="presentation"></div>
+
+  <!-- ══ PANEL DOLNY ═══════════════════════════════════════════════ -->
+  <aside id="bottom-panel" role="complementary" aria-label="Informacje o grzybobraniu">
+
+    <!-- Uchwyt -->
+    <div class="panel-handle" role="presentation"></div>
+
+    <!-- Panel Header -->
+    <div class="panel-header">
+      <h1 class="panel-title">🌲 Analiza Terenu</h1>
+      <div style="display:flex;gap:6px">
+        <button id="btn-refresh" class="icon-btn" title="Odśwież dane" aria-label="Odśwież dane" style="width:32px;height:32px;font-size:14px">🔄</button>
+        <button class="panel-close" id="btn-panel-toggle" aria-label="Zamknij panel">✕</button>
+      </div>
+    </div>
+
+    <!-- Scroll area -->
+    <div class="panel-scroll">
+
+      <!-- Sekcja: Las -->
+      <section class="section" aria-labelledby="section-forest-title">
+        <div class="section-title" id="section-forest-title">🌲 Informacje o lesie</div>
+        <div id="forest-info">
+          <div class="forest-empty">
+            <span class="forest-icon">📍</span>
+            <p>Kliknij przycisk lokalizacji, aby wykryć las i sprawdzić warunki do grzybobrania.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sekcja: Pogoda -->
+      <section class="section" aria-labelledby="section-weather-title">
+        <div class="section-title" id="section-weather-title">🌦️ Warunki pogodowe</div>
+        <div id="weather-info">
+          <p class="no-data">Brak danych — włącz lokalizację</p>
+        </div>
+      </section>
+
+      <!-- Sekcja: Ocena ogólna -->
+      <section class="section" aria-labelledby="section-score-title">
+        <div class="section-title" id="section-score-title">📊 Ocena warunków</div>
+        <div class="score-card">
+          <div class="score-header">
+            <span id="score-emoji" style="font-size:36px">❓</span>
+            <div>
+              <div id="overall-score" class="score-number">—</div>
+              <div id="score-label" class="score-label">Brak danych</div>
+            </div>
+          </div>
+          <div class="score-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            <div id="score-bar-fill" class="score-bar-fill" style="width:0%;background:#6b7280"></div>
+          </div>
+          <p id="summary-text" class="summary-text">
+            Włącz lokalizację GPS, aby otrzymać ocenę warunków do grzybobrania w Twoim lesie.
+          </p>
+          <p id="summary-tip"></p>
+          <div id="score-diagnosis" class="score-diagnosis hidden">
+            <div class="diagnosis-header">🔍 Dlaczego taki wynik w tym punkcie?</div>
+            <div id="diagnosis-factors" class="diagnosis-factors"></div>
+            <div class="diagnosis-note">
+              💡 <strong>Wskazówka taktyczna:</strong> Heatmapa na mapie odzwierciedla wiek i gatunki poszczególnych wydzieleń LP. Jeśli jesteś w młodej uprawie lub suchym borze, przejdź kilkaset metrów do sąsiedniego starodrzewu (40–100 lat) na siedlisku świeżym (BŚW/BMŚW).
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sekcja: Grzyby -->
+      <section class="section" aria-labelledby="section-mushrooms-title">
+        <div class="section-title" id="section-mushrooms-title">🍄 Spodziewane gatunki</div>
+        <div id="mushroom-list">
+          <p class="no-data">Brak danych — włącz lokalizację</p>
+        </div>
+      </section>
+
+      <!-- Stopka -->
+      <footer style="padding: 12px 0 8px; text-align: center; color: var(--text-muted); font-size: 11px; line-height: 1.6;">
+        Dane: Lasy Państwowe BDL · GBIF · Open-Meteo<br>
+        ⚠️ Nigdy nie jedz grzyba bez 100% pewności co do gatunku.
+      </footer>
+
+    </div><!-- /panel-scroll -->
+  </aside><!-- /bottom-panel -->
+
+</div><!-- /app -->
+
+<!-- ══ SKRYPTY ══════════════════════════════════════════════════════ -->
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet.heat -->
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+
+
+<!-- Główna aplikacja (ES modules) -->
+<script type="module" src="js/app.js?v=4.2"></script>
+
+<!-- Service Worker Cache Purge & Register -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (const reg of registrations) {
+        reg.update();
+      }
+    });
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        for (const name of names) {
+          if (!name.includes('v4')) {
+            caches.delete(name);
+          }
+        }
+      });
+    }
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>

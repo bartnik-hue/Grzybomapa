@@ -1,0 +1,879 @@
+/* =====================================================
+   GrzyboMapa — style.css
+   Dark forest theme | Glassmorphism | Mobile-first
+   ===================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Tokeny designu ──────────────────────────────────── */
+:root {
+  --bg-dark:       #0b1612;
+  --bg-surface:    #111e18;
+  --bg-card:       rgba(20, 35, 25, 0.82);
+  --bg-card-hover: rgba(26, 46, 32, 0.92);
+  --border:        rgba(74, 222, 128, 0.12);
+  --border-bright: rgba(74, 222, 128, 0.28);
+
+  --green-primary: #4ade80;
+  --green-dark:    #16a34a;
+  --green-glow:    rgba(74, 222, 128, 0.25);
+  --amber:         #fbbf24;
+  --red:           #f87171;
+  --blue:          #60a5fa;
+
+  --text-primary:  #e8f5e9;
+  --text-secondary:#a7c3af;
+  --text-muted:    #6b8e78;
+
+  --glass-bg:      rgba(11, 22, 18, 0.75);
+  --glass-blur:    18px;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 30px;
+
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.55), 0 0 0 1px var(--border);
+  --shadow-glow: 0 0 20px var(--green-glow);
+
+  --panel-height: 72vh;
+  --header-h: 64px;
+}
+
+/* ── Reset ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ── Splash screen ───────────────────────────────────── */
+#splash {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg-dark);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+#splash.hidden { opacity: 0; transform: scale(1.05); pointer-events: none; }
+.splash-icon { font-size: 72px; animation: bounceIn 0.6s ease; }
+.splash-title {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--green-primary), #86efac);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.splash-sub { color: var(--text-secondary); font-size: 14px; }
+.splash-dots { display: flex; gap: 6px; margin-top: 8px; }
+.splash-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green-primary); opacity: 0.3;
+  animation: dotPulse 1.4s infinite;
+}
+.splash-dot:nth-child(2) { animation-delay: 0.2s; }
+.splash-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── Layout główny ───────────────────────────────────── */
+#app {
+  display: flex; flex-direction: column;
+  height: 100dvh; position: relative;
+}
+
+/* ── Header ──────────────────────────────────────────── */
+#header {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: var(--header-h); z-index: 500;
+  display: flex; align-items: center;
+  padding: 0 16px; gap: 12px;
+  background: linear-gradient(180deg, rgba(11,22,18,0.95) 0%, transparent 100%);
+  backdrop-filter: blur(4px);
+}
+
+.header-logo {
+  display: flex; align-items: center; gap: 8px; flex: 1;
+}
+.logo-icon { font-size: 28px; filter: drop-shadow(0 0 8px var(--green-glow)); }
+.logo-text {
+  font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+  background: linear-gradient(135deg, var(--green-primary) 0%, #86efac 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.logo-badge {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.5px;
+  color: var(--green-dark); background: rgba(74,222,128,0.15);
+  border: 1px solid rgba(74,222,128,0.3);
+  padding: 1px 6px; border-radius: 20px;
+}
+
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 12px; border: none;
+  background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 18px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s ease;
+}
+.icon-btn:hover { background: var(--bg-card-hover); color: var(--green-primary); border-color: var(--border-bright); }
+.icon-btn.active { background: var(--green-glow); color: var(--green-primary); border-color: var(--green-primary); }
+.icon-btn.loading { animation: spin 1s linear infinite; }
+
+/* ── Mapa ────────────────────────────────────────────── */
+#map {
+  flex: 1;
+  position: absolute; inset: 0;
+  z-index: 0;
+  filter: saturate(0.85) brightness(0.92);
+}
+
+/* Marker użytkownika */
+.user-marker { position: relative; width: 24px; height: 24px; }
+.user-marker-dot {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--green-primary);
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 3px rgba(74,222,128,0.4);
+  z-index: 2;
+}
+.user-marker-pulse {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(74, 222, 128, 0.3);
+  animation: pulse 2s ease-out infinite;
+}
+
+/* ── Status bar ──────────────────────────────────────── */
+#status-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  z-index: 450;
+  padding: 10px 16px;
+  font-size: 13px; font-weight: 500;
+  display: none; align-items: center; gap: 8px;
+  backdrop-filter: blur(8px);
+}
+#status-bar.info  { background: rgba(59,130,246,0.2); color: #93c5fd; border-top: 1px solid rgba(59,130,246,0.3); }
+#status-bar.warn  { background: rgba(251,191,36,0.15); color: #fde68a; border-top: 1px solid rgba(251,191,36,0.3); }
+#status-bar.error { background: rgba(239,68,68,0.15); color: #fca5a5; border-top: 1px solid rgba(239,68,68,0.3); }
+
+/* ── Przycisk nawigacyjny "Pokaż wyniki" ─────────────── */
+#fab-panel {
+  position: absolute; bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  background: linear-gradient(135deg, var(--green-dark), #15803d);
+  color: #fff; font-size: 14px; font-weight: 600;
+  padding: 14px 28px; border-radius: var(--radius-xl);
+  border: none; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(22,163,74,0.5), 0 0 0 1px rgba(74,222,128,0.3);
+  display: flex; align-items: center; gap: 8px;
+  transition: all 0.3s ease;
+  animation: slideUp 0.5s ease 1.9s both;
+}
+#fab-panel:hover { transform: translateX(-50%) translateY(-2px); box-shadow: 0 8px 28px rgba(22,163,74,0.6); }
+#fab-panel.hidden { display: none; }
+
+/* ── Panel dolny (bottom sheet) ─────────────────────── */
+#panel-backdrop {
+  position: fixed; inset: 0; z-index: 700;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+#panel-backdrop.active { opacity: 1; pointer-events: all; }
+
+#bottom-panel {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  z-index: 800;
+  height: var(--panel-height);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--border-bright);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+  display: flex; flex-direction: column;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.6);
+}
+#bottom-panel.open { transform: translateY(0); }
+
+/* Panel handle */
+.panel-handle {
+  width: 36px; height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px; margin: 12px auto 4px;
+  flex-shrink: 0; cursor: grab;
+}
+
+/* Panel header */
+.panel-header {
+  display: flex; align-items: center; padding: 8px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-title {
+  flex: 1; font-size: 16px; font-weight: 600; color: var(--text-primary);
+}
+.panel-close {
+  width: 32px; height: 32px; border-radius: 8px; border: none;
+  background: transparent; color: var(--text-muted);
+  font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.panel-close:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+
+/* Panel scroll area */
+.panel-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.panel-scroll::-webkit-scrollbar { width: 4px; }
+.panel-scroll::-webkit-scrollbar-track { background: transparent; }
+.panel-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Sekcje panelu ───────────────────────────────────── */
+.section { margin-bottom: 20px; }
+.section-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.section-title::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ── Karta lasu ──────────────────────────────────────── */
+.forest-header {
+  display: flex; align-items: flex-start; gap: 14px; margin-bottom: 12px;
+}
+.forest-icon-big { font-size: 40px; line-height: 1; flex-shrink: 0; }
+.forest-name {
+  font-size: 17px; font-weight: 700; color: var(--text-primary);
+  line-height: 1.3; margin-bottom: 2px;
+}
+.forest-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+
+.badge {
+  display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+  padding: 2px 8px; border-radius: 20px;
+}
+.badge-lp  { background: rgba(74,222,128,0.15); color: var(--green-primary); border: 1px solid rgba(74,222,128,0.3); }
+.badge-osm { background: rgba(96,165,250,0.15); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); }
+.badge-pin { background: rgba(251,191,36,0.18); color: #fbbf24; border: 1px solid rgba(251,191,36,0.4); }
+.badge-gps { background: rgba(96,165,250,0.18); color: #60a5fa; border: 1px solid rgba(96,165,250,0.4); }
+
+.forest-details { display: flex; flex-wrap: wrap; gap: 6px; }
+.detail-chip {
+  font-size: 12px; color: var(--text-secondary);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 20px;
+}
+.detail-chip strong { color: var(--text-primary); }
+
+.forest-empty {
+  text-align: center; padding: 16px; color: var(--text-muted);
+  font-size: 13px; line-height: 1.6;
+}
+.forest-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+/* ── Skład drzewostanu ───────────────────────────────── */
+.composition-block {
+  margin: 10px 0;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+.composition-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+  color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.species-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px;
+}
+.species-row:last-child { margin-bottom: 0; }
+.species-pct {
+  font-size: 12px; font-weight: 700; color: var(--green-primary);
+  min-width: 34px; text-align: right; flex-shrink: 0;
+}
+.species-bar-wrap {
+  width: 52px; height: 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px; overflow: hidden; flex-shrink: 0;
+}
+.species-bar {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--green-primary), #86efac);
+  transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+.species-name {
+  font-size: 13px; color: var(--text-primary); line-height: 1.3;
+}
+.species-name strong { font-weight: 600; }
+.species-name em {
+  font-size: 11px; color: var(--text-muted);
+  font-style: italic; margin-left: 3px;
+}
+
+
+/* ── Pogoda ──────────────────────────────────────────── */
+.weather-grid {
+  display: flex; gap: 12px; align-items: center;
+}
+.weather-current {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px; flex-shrink: 0;
+}
+.weather-icon-big { font-size: 32px; }
+.temp-big { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+.weather-desc { font-size: 11px; color: var(--text-secondary); }
+
+.weather-stats {
+  flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+.w-stat {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 6px 10px;
+}
+.w-stat-label { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px; }
+.w-stat-value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.w-stat-value.rain { color: var(--blue); }
+.w-stat-value.warn { color: var(--amber); }
+
+/* ── Overall score ───────────────────────────────────── */
+.score-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+.score-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.score-emoji { font-size: 36px; }
+.score-number {
+  font-size: 42px; font-weight: 800; line-height: 1;
+  background: linear-gradient(135deg, var(--green-primary), #86efac);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.score-label {
+  font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-top: 2px;
+}
+
+.score-bar {
+  height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;
+  margin-bottom: 12px;
+}
+.score-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.5s;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.summary-text {
+  font-size: 13px; color: var(--text-secondary); line-height: 1.65;
+}
+
+/* ── Diagnoza przyczyn wyniku ────────────────────────── */
+.score-diagnosis {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.diagnosis-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  margin-bottom: 10px;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.diagnosis-factors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diag-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  transition: background 0.2s;
+}
+.diag-item.diag-good {
+  border-color: rgba(74, 222, 128, 0.25);
+  background: rgba(74, 222, 128, 0.04);
+}
+.diag-item.diag-bad {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.04);
+}
+.diag-icon {
+  font-size: 18px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.diag-body {
+  flex: 1;
+  min-width: 0;
+}
+.diag-title {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.3;
+}
+.diag-val {
+  font-weight: 700;
+  color: #fde68a;
+}
+.diag-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.diag-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.badge-good {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--green-primary);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.badge-bad {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--red);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+.badge-neutral {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+.diagnosis-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px dashed rgba(251, 191, 36, 0.35);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Lista grzybów ───────────────────────────────────── */
+.mushroom-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.mushroom-card:hover { border-color: var(--border-bright); background: var(--bg-card-hover); }
+.mushroom-card.danger { border-color: rgba(239,68,68,0.2); }
+.mushroom-card.danger:hover { border-color: rgba(239,68,68,0.45); }
+
+.mushroom-main {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+}
+.mushroom-icon { font-size: 28px; flex-shrink: 0; }
+.mushroom-info { flex: 1; min-width: 0; }
+.mushroom-name {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mushroom-latin {
+  font-size: 11px; color: var(--text-muted); font-style: italic; margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mushroom-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.tag {
+  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.2px;
+}
+.tag-relation {
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.06);
+}
+
+.mushroom-score-col {
+  text-align: right; flex-shrink: 0; min-width: 64px;
+}
+.mushroom-score {
+  font-size: 18px; font-weight: 800; line-height: 1;
+}
+.score-bar-mini {
+  height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px;
+  overflow: hidden; margin: 4px 0;
+}
+.score-bar-fill-mini {
+  height: 100%; border-radius: 2px;
+  transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1);
+}
+.score-label-mini { font-size: 9px; color: var(--text-muted); white-space: nowrap; }
+
+/* Badge tagi jadalne */
+.tag.edible-yes  { color: #4ade80; background: rgba(74,222,128,0.12); }
+.tag.edible-no   { color: #f87171; background: rgba(248,113,113,0.12); }
+.tag.edible-warn { color: #fb923c; background: rgba(251,146,60,0.12); }
+.tag.edible-info { color: #94a3b8; background: rgba(148,163,184,0.10); }
+
+/* Etykiety grup grzybów */
+.mushroom-group-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.7px;
+  text-transform: uppercase; color: var(--green-primary);
+  padding: 10px 2px 5px; margin-top: 6px;
+}
+.mushroom-group-label.warn   { color: #fb923c; }
+.mushroom-group-label.danger { color: #f87171; }
+
+/* Szczegóły grzyba (collapse/expand) */
+.mushroom-detail {
+  overflow: hidden; padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 13px; color: var(--text-secondary); line-height: 1.65;
+}
+.mushroom-detail.hidden { display: none; }
+.mushroom-desc { margin: 0 0 10px; }
+
+/* Komponenty scoringu */
+.score-components {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 5px; margin: 8px 0;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+}
+.sc-item { display: flex; justify-content: space-between; align-items: center; }
+.sc-label { font-size: 11px; color: var(--text-muted); }
+.sc-val   { font-size: 11px; font-weight: 700; }
+
+/* Ekologia grzyba */
+.ecology-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* Link Wikipedia */
+.wiki-row {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.wiki-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-muted);
+  text-decoration: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.wiki-link:hover {
+  color: #fff;
+  border-color: #a0a0a0;
+  background: rgba(255,255,255,0.08);
+}
+.wiki-link em { font-style: italic; opacity: 0.75; }
+.wiki-icon {
+  width: 14px; height: 14px;
+  fill: currentColor; flex-shrink: 0;
+}
+
+/* Wskazówka w summary */
+#summary-tip {
+  font-size: 12px; color: var(--text-muted);
+  margin-top: 4px; font-style: italic;
+  line-height: 1.5;
+}
+
+.danger-warning {
+  margin-top: 8px; color: var(--red); font-weight: 600;
+  font-size: 12px;
+}
+
+/* ── Puste stany ─────────────────────────────────────── */
+.empty-list, .no-data {
+  text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px; line-height: 1.7;
+}
+
+/* ── Loading skeletons ───────────────────────────────── */
+.loading-skeleton {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px; margin-bottom: 8px;
+}
+.mushroom-skeleton { height: 70px; }
+.skeleton-line {
+  height: 12px; border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite; margin-bottom: 8px;
+}
+.skeleton-line.short { width: 55%; }
+
+/* ── Animacje ────────────────────────────────────────── */
+@keyframes pulse {
+  0%   { transform: translate(-50%,-50%) scale(0.5); opacity: 0.9; }
+  100% { transform: translate(-50%,-50%) scale(2);   opacity: 0; }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes dotPulse {
+  0%, 60%, 100% { opacity: 0.3; transform: scale(1); }
+  30% { opacity: 1; transform: scale(1.3); }
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(0.4); opacity: 0; }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(30px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Leaflet overrides ───────────────────────────────── */
+.leaflet-control-attribution {
+  background: rgba(11,22,18,0.75) !important;
+  color: var(--text-muted) !important; font-size: 10px !important;
+}
+.leaflet-control-attribution a { color: var(--green-primary) !important; }
+.leaflet-control-zoom a {
+  background: var(--glass-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+  backdrop-filter: blur(var(--glass-blur));
+}
+.leaflet-control-zoom a:hover { background: var(--bg-card-hover) !important; color: var(--green-primary) !important; }
+
+/* ── Responsywność — większe ekrany ─────────────────── */
+@media (min-width: 480px) {
+  #bottom-panel { max-width: 480px; left: 50%; transform: translateX(-50%) translateY(100%); border-radius: var(--radius-xl); bottom: 16px; }
+  #bottom-panel.open { transform: translateX(-50%) translateY(0); }
+  #panel-backdrop { border-radius: 0; }
+}
+
+/* ── Marker pinezki (tryb ręcznego wyboru punktu) ────── */
+.custom-pin-container {
+  overflow: visible !important;
+}
+.pin-marker-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  pointer-events: auto;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.65));
+  animation: pinDrop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.15s ease;
+}
+.pin-marker-wrapper:hover {
+  transform: scale(1.1);
+}
+.pin-marker-wrapper:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+.pin-badge-label {
+  background: #fbbf24;
+  color: #0b1612;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  margin-bottom: 2px;
+  letter-spacing: 0.3px;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+.pin-marker-head {
+  font-size: 34px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(251,191,36,0.8));
+}
+.pin-marker-pulse {
+  width: 16px;
+  height: 6px;
+  background: rgba(251,191,36,0.5);
+  border-radius: 50%;
+  margin-top: -3px;
+  animation: pinPulseRing 1.8s infinite;
+}
+
+@keyframes pinPulseRing {
+  0%   { transform: scale(1); opacity: 0.9; }
+  50%  { transform: scale(2.2); opacity: 0.25; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
+@keyframes pinDrop {
+  0%   { transform: translateY(-24px) scale(0.6); opacity: 0; }
+  70%  { transform: translateY(4px) scale(1.1); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ── Dymek podpowiedzi trybu pinezki ─────────────────── */
+.pin-hint {
+  position: absolute;
+  bottom: 90px; left: 50%; transform: translateX(-50%);
+  z-index: 401;
+  background: rgba(251,191,36,0.18);
+  border: 1px solid rgba(251,191,36,0.45);
+  color: #fde68a;
+  font-size: 13px; font-weight: 500;
+  padding: 10px 20px;
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(12px);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: hintPop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.pin-hint.hidden { display: none; }
+
+@keyframes hintPop {
+  from { transform: translateX(-50%) translateY(10px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}
+
+/* Wyróżnienie aktywnego trybu pinezki — pulsujące obramowanie */
+#btn-pin-mode.active {
+  background: rgba(251,191,36,0.18) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(251,191,36,0.6) !important;
+  box-shadow: 0 0 0 3px rgba(251,191,36,0.15);
+  animation: pinBtnPulse 2s ease-in-out infinite;
+}
+
+@keyframes pinBtnPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(251,191,36,0.15); }
+  50%       { box-shadow: 0 0 0 6px rgba(251,191,36,0.05); }
+}
+
+/* ── Heatmapa — legenda ───────────────────────────────── */
+.heatmap-legend {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 800;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  min-width: 240px;
+  box-shadow: var(--shadow-card);
+  animation: fadeSlideUp 0.35s ease;
+}
+.heatmap-legend-title {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px; letter-spacing: 0.3px;
+}
+.heatmap-gradient-bar {
+  display: flex; align-items: center; gap: 8px;
+}
+.heatmap-gradient {
+  flex: 1; height: 10px; border-radius: 5px;
+  background: linear-gradient(to right,
+    #1e1b4b, #3b82f6, #10b981, #84cc16, #eab308, #f97316, #dc2626);
+  box-shadow: 0 0 8px rgba(234,179,8,0.3);
+}
+.heatmap-label-lo,
+.heatmap-label-hi {
+  font-size: 10px; color: var(--text-muted);
+  white-space: nowrap; flex-shrink: 0;
+}
+.heatmap-legend-note {
+  margin-top: 6px;
+  font-size: 10px; color: var(--text-muted);
+  text-align: center;
+}
+.heatmap-loading-bar {
+  height: 2px; border-radius: 1px; margin-top: 6px;
+  background: linear-gradient(90deg, #10b981, #eab308, #dc2626);
+  background-size: 200%;
+  animation: heatmapScan 1.4s linear infinite;
+}
+.heatmap-loading-bar.hidden {
+  display: none !important;
+}
+@keyframes heatmapScan {
+  0%   { background-position: 0%; }
+  100% { background-position: 200%; }
+}
+
+/* Przycisk heatmapy — stan aktywny */
+#btn-heatmap.active {
+  background: rgba(239,68,68,0.15) !important;
+  color: #f97316 !important;
+  border-color: rgba(249,115,22,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Tooltip ramki obszaru analizy */
+.heatmap-rect-tooltip {
+  background: rgba(11,22,18,0.90) !important;
+  border: 1px solid #eab308 !important;
+  color: #eab308 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  padding: 4px 10px !important;
+  box-shadow: none !important;
+}
+.heatmap-rect-tooltip::before { display: none !important; }

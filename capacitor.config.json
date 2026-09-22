@@ -1,0 +1,17 @@
+{
+  "appId": "pl.grzybomap.app",
+  "appName": "GrzyboMapa",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "Geolocation": {
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+    }
+  },
+  "android": {
+    "allowMixedContent": true,
+    "useLegacyBridge": false
+  }
+}

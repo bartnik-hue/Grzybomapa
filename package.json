@@ -1,0 +1,29 @@
+{
+  "name": "grzybomap",
+  "version": "1.0.0",
+  "description": "GrzyboMapa – Android app helper for mushroom picking in Polish forests",
+  "main": "www/index.html",
+  "scripts": {
+    "dev": "npx serve www -p 3000 --no-clipboard",
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:run": "npx cap run android"
+  },
+  "keywords": [
+    "grzyby",
+    "mushroom",
+    "android",
+    "pwa",
+    "lasy-państwowe"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/android": "^7.4.2",
+    "@capacitor/cli": "^7.4.2",
+    "@capacitor/core": "^7.4.2"
+  },
+  "devDependencies": {
+    "serve": "^14.2.6"
+  }
+}

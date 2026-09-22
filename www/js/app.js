@@ -1,0 +1,733 @@
+/**
+ * app.js
+ * Główny moduł aplikacji GrzyboMapa
+ * Integruje: GPS, OGC API LP, pogoda, scoring, UI
+ */
+
+import { startTracking, getCurrentPosition, stopTracking } from './location.js';
+import { getForestData, getForestBoundary } from './forest_api.js';
+import { getWeatherData, weatherCodeToText, weatherCodeToIcon } from './weather.js';
+import { getMushroomsForStand, getMushroomsForMixedForest, filterBySeason, TREE_SPECIES } from './mushroom_knowledge.js';
+import { scoreAllMushrooms, calculateOverallScore, generateSummary, generateDetailedDiagnosis, edibleLabel, scoreToColor, scoreToLabel } from './scoring.js';
+import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive } from './map.js';
+import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=4.2';
+
+// ── Stan aplikacji ─────────────────────────────────────────────────
+const state = {
+  lat: null,
+  lng: null,
+  accuracy: null,
+  forestData: null,
+  weatherData: null,
+  mushroomList: [],
+  overallScore: 0,
+  summary: null,
+  diagnosis: [],
+  isLoading: false,
+  panelOpen: false,
+  isTracking: false,
+  pinMode: false,       // czy tryb ręcznego wyboru punktu
+  pinLat: null,         // współrzędne wybranego pinu
+  pinLng: null,
+};
+
+// ── Elementy UI ────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+// ── Inicjalizacja ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  // Inicjalizacja mapy
+  const leafletMap = initMap('map');
+
+  // Inicjalizacja heatmapy (po załadowaniu Leaflet.heat z CDN)
+  initHeatmap(leafletMap);
+
+  // Bindowania przycisków
+  $('btn-locate').addEventListener('click', onLocateClick);
+  $('btn-pin-mode').addEventListener('click', onPinModeClick);
+  $('fab-panel').addEventListener('click', togglePanel);
+  $('btn-panel-toggle').addEventListener('click', closePanel);
+  $('panel-backdrop').addEventListener('click', closePanel);
+  $('btn-refresh').addEventListener('click', () => {
+    const lat = state.pinMode ? state.pinLat : state.lat;
+    const lng = state.pinMode ? state.pinLng : state.lng;
+    loadAllData(lat, lng);
+  });
+  $('btn-layer-toggle').addEventListener('click', onLayerToggle);
+  $('btn-heatmap').addEventListener('click', onHeatmapToggle);
+
+  // Sprawdź czy Geolocation jest dostępne
+  if (!navigator.geolocation) {
+    showError('Twoje urządzenie nie obsługuje GPS.');
+  }
+
+  // Splash — ukryj po chwili
+  setTimeout(() => {
+    $('splash')?.classList.add('hidden');
+  }, 1800);
+
+  // Uruchom od razu próbnik terenu — pinezka natychmiast pojawia się na mapie!
+  activatePinMode();
+});
+
+// ── Kliknięcie Lokalizuj ───────────────────────────────────────────
+// ── Kliknięcie Lokalizuj (GPS Na Żywo) ─────────────────────────────
+async function onLocateClick() {
+  // Wyłącz tryb próbkowania/pinezki jeśli był aktywny
+  if (state.pinMode) {
+    deactivatePinMode();
+  }
+
+  if (state.isTracking && state.mode === 'gps') {
+    // Już śledzimy na żywo — wycentruj mapę na użytkowniku
+    if (state.lat) panTo(state.lat, state.lng, 16);
+    return;
+  }
+
+  state.mode = 'gps';
+  stopTracking();
+  removePin();
+
+  $('btn-locate').classList.add('loading');
+  setStatus('Pobieranie lokalizacji GPS…', 'info');
+
+  try {
+    const pos = await getCurrentPosition();
+    state.lat = pos.lat;
+    state.lng = pos.lng;
+    state.accuracy = pos.accuracy;
+    state.isTracking = true;
+
+    updateUserPosition(pos.lat, pos.lng, pos.accuracy, true);
+    $('btn-locate').classList.remove('loading');
+    $('btn-locate').classList.add('active');
+
+    updatePanelSource('gps', pos.lat, pos.lng);
+    await loadAllData(pos.lat, pos.lng);
+  } catch (e) {
+    $('btn-locate').classList.remove('loading');
+    showError(getGpsError(e));
+    return;
+  }
+
+  // Ciągłe śledzenie na żywo
+  startTracking(
+    async (lat, lng, accuracy) => {
+      // Wykonaj odświeżenie tylko jeśli nadal jesteśmy w trybie GPS
+      if (state.mode !== 'gps') return;
+      state.lat = lat; state.lng = lng; state.accuracy = accuracy;
+      updateUserPosition(lat, lng, accuracy, false);
+      await loadAllData(lat, lng);
+    },
+    (code, msg) => {
+      if (state.mode === 'gps') showError(msg);
+    },
+  );
+}
+
+// ── Tryb Próbnika (Kliknij na mapę) ────────────────────────────────
+function onPinModeClick() {
+  if (state.pinMode) {
+    deactivatePinMode();
+  } else {
+    activatePinMode();
+  }
+}
+
+function activatePinMode() {
+  state.pinMode = true;
+  state.mode = 'pin';
+
+  // ZATRZYMAJ GPS — śledzenie GPS nie może nadpisywać próbnika ręcznego!
+  stopTracking();
+  state.isTracking = false;
+
+  $('btn-pin-mode').classList.add('active');
+  $('btn-locate').classList.remove('active');
+  $('btn-locate').classList.remove('loading');
+  $('pin-hint').classList.remove('hidden');
+
+  // Włącz ciągłe bindowanie kliknięć i przeciągnięć mapy (Próbnik)
+  setPinMode(true, async (lat, lng) => {
+    state.pinLat = lat;
+    state.pinLng = lng;
+    updatePanelSource('pin', lat, lng);
+    setHeatmapCenter(lat, lng);
+    showPanel(true);
+    await loadAllData(lat, lng);
+  });
+
+  // Użyj istniejącego pinu lub natychmiast postaw pinezkę w centrum widoku mapy
+  if (!state.pinLat || !state.pinLng) {
+    const mapObj = getMap();
+    if (mapObj) {
+      const c = mapObj.getCenter();
+      state.pinLat = c.lat;
+      state.pinLng = c.lng;
+    }
+  }
+
+  if (state.pinLat && state.pinLng) {
+    setPin(state.pinLat, state.pinLng);
+    updatePanelSource('pin', state.pinLat, state.pinLng);
+    setHeatmapCenter(state.pinLat, state.pinLng);
+    loadAllData(state.pinLat, state.pinLng);
+  }
+}
+
+function deactivatePinMode() {
+  state.pinMode = false;
+  if (state.mode === 'pin') state.mode = null;
+
+  $('btn-pin-mode').classList.remove('active');
+  $('pin-hint').classList.add('hidden');
+  setPinMode(false); // wyłącza kursor crosshair i robi removePin()
+  setStatus('', '');
+
+  if (state.lat && state.lng) {
+    updatePanelSource('gps', state.lat, state.lng);
+  }
+}
+
+/**
+ * Aktualizuje tytuł i nagłówek panelu zależnie od trybu (GPS vs Próbnik)
+ */
+function updatePanelSource(source, lat, lng) {
+  const titleEl = document.querySelector('.panel-title');
+  if (!titleEl) return;
+
+  if (source === 'pin' || state.pinMode) {
+    const curLat = lat || state.pinLat;
+    const curLng = lng || state.pinLng;
+    const coordsStr = (curLat && curLng) ? `${curLat.toFixed(5)}, ${curLng.toFixed(5)}` : 'Wskaż punkt na mapie';
+    titleEl.innerHTML = `📌 Próbnik Terenu
+      <small style="font-size:11px;color:#fbbf24;font-weight:600;display:block;margin-top:2px">
+        📍 Próbka: ${coordsStr}
+      </small>`;
+  } else {
+    const curLat = lat || state.lat;
+    const curLng = lng || state.lng;
+    const coordsStr = (curLat && curLng) ? `${curLat.toFixed(5)}, ${curLng.toFixed(5)}` : '';
+    titleEl.innerHTML = `📡 Analiza GPS (Na Żywo)
+      <small style="font-size:11px;color:#60a5fa;font-weight:400;display:block;margin-top:2px">
+        ${coordsStr ? `GPS: ${coordsStr}` : 'Lokalizacja na żywo'}
+      </small>`;
+  }
+}
+
+// ── Ładuj wszystkie dane ───────────────────────────────────────────
+async function loadAllData(lat, lng) {
+  if (!lat || !lng) return;
+  if (state.isLoading) return;
+
+  state.isLoading = true;
+  showPanel(true);
+  setStatus('Wykrywanie lasu…', 'info');
+  renderLoading();
+
+  try {
+    // Równolegle: dane lasu + pogoda
+    const [forestData, weatherData] = await Promise.allSettled([
+      getForestData(lat, lng),
+      getWeatherData(lat, lng),
+    ]);
+
+    state.forestData = forestData.status === 'fulfilled' ? forestData.value : null;
+    state.weatherData = weatherData.status === 'fulfilled' ? weatherData.value : null;
+
+    if (!state.forestData) {
+      // Nie jesteśmy w lesie państwowym
+      setStatus('Brak danych leśnych — możliwe, że nie jesteś w lesie.', 'warn');
+    }
+
+    // Rysuj granicę wydzielenia — jeśli OGC zwróciło geometrię w _feature, użyj jej
+    if (state.forestData?._feature) {
+      showForestBoundary(state.forestData._feature);
+    } else if (state.forestData) {
+      getForestBoundary(lat, lng).then(b => showForestBoundary(b));
+    }
+
+    // Oblicz grzyby i scoring
+    const month = new Date().getMonth() + 1;
+    const f = state.forestData;
+
+    // Skład z procentami — jeśli mamy rawCode to parsujemy, inaczej równe udziały
+    let speciesWithPct = [];
+    if (f?.rawCode) {
+      speciesWithPct = parseCompositionForScoring(f.rawCode, f.speciesCodes);
+    } else if (f?.speciesCodes?.length) {
+      const eqPct = Math.round(100 / f.speciesCodes.length);
+      speciesWithPct = f.speciesCodes.map(c => ({ code: c, pct: eqPct }));
+    }
+
+    const weatherAnalysis = state.weatherData?.analysis || null;
+    let mushrooms;
+    if (speciesWithPct.length > 0) {
+      mushrooms = getMushroomsForStand(speciesWithPct, f?.habitatCode);
+      mushrooms = filterBySeason(mushrooms, month);
+    } else {
+      // Brak danych o drzewostanie — pokaż gatunki powszechne
+      mushrooms = filterBySeason(getMushroomsForStand([], null), month);
+    }
+
+    state.mushroomList = scoreAllMushrooms(mushrooms, weatherAnalysis, month);
+    state.overallScore = calculateOverallScore(weatherAnalysis, state.forestData);
+    state.summary = generateSummary(
+      state.overallScore,
+      weatherAnalysis,
+      f?.forestName
+    );
+    state.diagnosis = generateDetailedDiagnosis(
+      state.overallScore,
+      weatherAnalysis,
+      state.forestData
+    );
+
+    renderAll();
+
+    // Aktualizuj heatmapę — centrum + dane pogodowe
+    setHeatmapCenter(lat, lng);
+    updateHeatmap(weatherAnalysis, month);
+    const statusEl = $('heatmap-status');
+    if (statusEl && weatherAnalysis) {
+      // status zostanie nadpisany przez heatmap.js po obliczeniu
+    }
+
+    setStatus('', '');
+
+  } catch (e) {
+    console.error('[App] loadAllData error:', e);
+    setStatus('Błąd pobierania danych. Sprawdź połączenie.', 'error');
+  } finally {
+    state.isLoading = false;
+  }
+}
+
+/**
+ * Parsuj rawCode LP do tablicy z procentami dla scoringu
+ * "6So4Db2Bk" → [{code:'So',pct:60},{code:'Db',pct:40},{code:'Bk',pct:20}]
+ * "SO"        → [{code:'So',pct:100}]
+ */
+function parseCompositionForScoring(rawCode, speciesCodes) {
+  if (!rawCode) {
+    const n = speciesCodes?.length || 1;
+    return (speciesCodes || []).map(c => ({ code: c, pct: Math.round(100 / n) }));
+  }
+
+  // Format z cyframi: "6So4Db"
+  const withNums = rawCode.match(/(\d+)([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]*)/g);
+  if (withNums?.length) {
+    return withNums.map(m => {
+      const num  = parseInt(m.match(/^(\d+)/)?.[1] || '1', 10);
+      const code = m.replace(/^\d+/, '');
+      return {
+        code: code.charAt(0).toUpperCase() + code.slice(1).toLowerCase(),
+        pct: num * 10,
+      };
+    });
+  }
+
+  // Prosty kod: "SO" lub "SO DB" — równe udziały
+  const parts = rawCode.trim().split(/\s+/);
+  const eqPct = Math.round(100 / parts.length);
+  return parts.map(p => ({
+    code: p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(),
+    pct: eqPct,
+  }));
+}
+
+// ── Renderowanie ───────────────────────────────────────────────────
+function renderAll() {
+  renderForestInfo();
+  renderWeather();
+  renderOverallScore();
+  renderMushrooms();
+}
+
+function renderForestInfo() {
+  const f = state.forestData;
+  const infoEl = $('forest-info');
+
+  if (!f) {
+    infoEl.innerHTML = `
+      <div class="forest-empty">
+        <span class="forest-icon">🌿</span>
+        <p>Nie jesteś w lesie państwowym lub brak zasięgu API.<br>
+        <small>Dane LP dostępne tylko w lasach zarządzanych przez Lasy Państwowe.</small></p>
+      </div>`;
+    return;
+  }
+
+  const modeBadge = state.pinMode
+    ? '<span class="badge badge-pin">📌 Próbka ręczna</span>'
+    : '<span class="badge badge-gps">📡 GPS na żywo</span>';
+
+  const sourceBadge = (f.source === 'OGC_LP' || f.source === 'LP_WFS')
+    ? '<span class="badge badge-lp">Lasy Państwowe</span>'
+    : '<span class="badge badge-osm">OpenStreetMap</span>';
+
+  const rdlpLabel = f.rdlp || f.nadlesnictwo || '';
+
+  // Rozszyfrowuj skład gatunkowy
+  const composition = decodeComposition(f.rawCode);
+  const compositionHtml = composition.length
+    ? composition.map(s => `
+        <div class="species-row">
+          <span class="species-pct">${s.pct !== null ? s.pct + '%' : ''}</span>
+          <span class="species-bar-wrap"><span class="species-bar" style="width:${s.pct ?? 100}%"></span></span>
+          <span class="species-name"><strong>${s.name}</strong> <em>${s.latin}</em></span>
+        </div>`).join('')
+    : `<p class="no-data" style="margin:0;font-size:12px">Brak danych o składzie</p>`;
+
+  // Czytelny opis siedliska
+  const habitatLabel = f.habitatCode
+    ? `${f.habitatCode} — ${decodeHabitat(f.habitatCode)}`
+    : null;
+
+  infoEl.innerHTML = `
+    <div class="forest-header">
+      <span class="forest-icon-big">🌲</span>
+      <div>
+        <h2 class="forest-name">${f.forestName || 'Las Państwowy'}</h2>
+        ${rdlpLabel ? `<p class="forest-sub">RDLP ${rdlpLabel}</p>` : ''}
+        <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
+          ${modeBadge}
+          ${sourceBadge}
+        </div>
+      </div>
+    </div>
+    <div class="composition-block">
+      <div class="composition-label">Skład drzewostanu</div>
+      ${compositionHtml}
+    </div>
+    <div class="forest-details">
+      ${habitatLabel  ? `<div class="detail-chip" title="Typ siedliskowy lasu">🏷️ ${habitatLabel}</div>` : ''}
+      ${f.specAge     ? `<div class="detail-chip">🌱 Wiek: <strong>${f.specAge}</strong></div>` : ''}
+      ${f.area        ? `<div class="detail-chip">📐 ${f.area}</div>` : ''}
+      ${f.adrFor      ? `<div class="detail-chip" title="Adres leśny">📌 ${f.adrFor.trim()}</div>` : ''}
+    </div>
+  `;
+}
+
+/**
+ * Rozszyfruj kod składu gatunkowego LP
+ * "6So4Db2Bk" → [{pct:60, name:'Sosna', latin:'Pinus sylvestris'}, ...]
+ * "SO"         → [{pct:null, name:'Sosna', latin:'Pinus sylvestris'}]
+ */
+function decodeComposition(rawCode) {
+  if (!rawCode) return [];
+
+  // Format z cyframi: "6So4Db2Bk" — cyfra to dziesiąte części (6 = 60%)
+  const withNums = rawCode.match(/(\d+)([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]*)/g);
+  if (withNums?.length) {
+    return withNums.map(m => {
+      const num  = parseInt(m.match(/^(\d+)/)?.[1] || '0', 10);
+      const code = m.replace(/^\d+/, '');
+      const norm = code.charAt(0).toUpperCase() + code.slice(1).toLowerCase();
+      const spec = TREE_SPECIES[norm];
+      return {
+        pct:   num * 10,
+        code:  norm,
+        name:  spec?.name  || norm,
+        latin: spec?.latin || '',
+      };
+    });
+  }
+
+  // Prosty kod bez cyfr: "SO" lub "SO DB"
+  const parts = rawCode.trim().split(/\s+/);
+  return parts.map(p => {
+    const norm = p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+    const spec = TREE_SPECIES[norm];
+    return {
+      pct:   null,
+      code:  norm,
+      name:  spec?.name  || norm,
+      latin: spec?.latin || '',
+    };
+  });
+}
+
+/**
+ * Rozszyfruj siedlisko LP na opis słowny
+ */
+function decodeHabitat(code) {
+  const HABITATS = {
+    'BŚW': 'Bór świeży', 'BSW': 'Bór świeży',
+    'BW':  'Bór wilgotny', 'BB': 'Bór bagienny',
+    'BMŚ': 'Bór mieszany świeży', 'BMŚW': 'Bór mieszany świeży',
+    'BMW': 'Bór mieszany wilgotny', 'BMB': 'Bór mieszany bagienny',
+    'LMŚ': 'Las mieszany świeży', 'LMŚW': 'Las mieszany świeży',
+    'LMW': 'Las mieszany wilgotny', 'LMB': 'Las mieszany bagienny',
+    'LŚW': 'Las świeży', 'LW': 'Las wilgotny',
+    'LL':  'Las łęgowy', 'LŁ': 'Las łęgowy',
+    'OL':  'Ols', 'OLJ': 'Ols jesionowy',
+    'BR':  'Bór chrobotkowy', 'BS': 'Bór suchy',
+  };
+  const key = (code || '').toUpperCase().replace(/\s/g, '');
+  return HABITATS[key] || code;
+}
+
+
+function renderWeather() {
+  const w = state.weatherData;
+  const el = $('weather-info');
+
+  if (!w?.current && !w?.analysis) {
+    el.innerHTML = `<p class="no-data">Brak danych pogodowych</p>`;
+    return;
+  }
+
+  const cur = w.current;
+  const a = w.analysis;
+
+  el.innerHTML = `
+    <div class="weather-grid">
+      <div class="weather-item weather-current">
+        <span class="weather-icon-big">${cur ? weatherCodeToIcon(cur.weathercode) : '🌡️'}</span>
+        <div>
+          <div class="temp-big">${cur ? `${Math.round(cur.temperature)}°C` : '—'}</div>
+          <div class="weather-desc">${cur ? weatherCodeToText(cur.weathercode) : 'Brak danych'}</div>
+        </div>
+      </div>
+      ${a ? `
+        <div class="weather-stats">
+          <div class="w-stat">
+            <span class="w-stat-label">Deszcz 14 dni</span>
+            <span class="w-stat-value rain">${Math.round(a.rain14)} mm</span>
+          </div>
+          <div class="w-stat">
+            <span class="w-stat-label">Śr. temperatura</span>
+            <span class="w-stat-value">${a.avgTemp7}°C</span>
+          </div>
+          <div class="w-stat">
+            <span class="w-stat-label">Ostatni deszcz</span>
+            <span class="w-stat-value">${a.lastRainDaysAgo >= 0 ? `${a.lastRainDaysAgo} dni temu` : 'Dziś'}</span>
+          </div>
+          <div class="w-stat">
+            <span class="w-stat-label">Susza</span>
+            <span class="w-stat-value ${a.droughtDays >= 5 ? 'warn' : ''}">${a.droughtDays} dni</span>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderOverallScore() {
+  const s = state.summary;
+  const score = state.overallScore;
+  const color = scoreToColor(score);
+
+  $('overall-score').textContent = `${score}%`;
+  $('score-label').textContent = scoreToLabel(score);
+  $('score-emoji').textContent = score >= 65 ? '🍄' : score >= 40 ? '🌿' : score >= 20 ? '🍂' : '🌵';
+  // summary.main i summary.tip (nowy format)
+  const mainText = s?.main || s?.text || '';
+  $('summary-text').textContent = mainText;
+
+  // Wskazówka (tip)
+  const tipEl = $('summary-tip');
+  if (tipEl) tipEl.textContent = s?.tip || '';
+
+  // Pasek progresu
+  const bar = $('score-bar-fill');
+  if (bar) { bar.style.width = `${score}%`; bar.style.background = color; }
+
+  // Szczegółowa diagnoza czynników
+  const diagEl = $('score-diagnosis');
+  const factorsEl = $('diagnosis-factors');
+  if (diagEl && factorsEl) {
+    if (state.diagnosis && state.diagnosis.length) {
+      diagEl.classList.remove('hidden');
+      factorsEl.innerHTML = state.diagnosis.map(f => `
+        <div class="diag-item diag-${f.type}">
+          <div class="diag-icon">${f.icon}</div>
+          <div class="diag-body">
+            <div class="diag-title">${f.title}: <span class="diag-val">${f.val}</span></div>
+            <div class="diag-sub">${f.desc}</div>
+          </div>
+          <div class="diag-badge badge-${f.type}">${f.impact}</div>
+        </div>
+      `).join('');
+    } else {
+      diagEl.classList.add('hidden');
+    }
+  }
+}
+
+function renderMushrooms() {
+  const el = $('mushroom-list');
+  const all = state.mushroomList;
+
+  if (!all || all.length === 0) {
+    el.innerHTML = `
+      <div class="empty-list">
+        <p>Brak danych o grzybach.<br>
+        <small>Wejdź do lasu państwowego, aby zobaczyć listę gatunków.</small></p>
+      </div>`;
+    return;
+  }
+
+  // Podziel na grupy
+  const edible   = all.filter(m => m.edible === 'jadalne' && m.score > 5);
+  const caution  = all.filter(m => (m.edible === 'uwaga' || m.edible === 'niejadalne') && m.score > 5);
+  const toxic    = all.filter(m => m.edible === 'trujące' && m.score > 3);
+
+  const renderGroup = (list, limit = 12) => list.slice(0, limit).map(m => {
+    const edibleInfo = edibleLabel(m.edible);
+    const barColor   = scoreToColor(m.score);
+    const id         = `d-${m.id}`;
+    const pct = m.score;
+    const cmp = m.components || {};
+
+    return `
+      <div class="mushroom-card ${m.danger ? 'danger' : ''}" onclick="toggleMushroomDetail('${id}')">
+        <div class="mushroom-main">
+          <span class="mushroom-icon">${m.icon}</span>
+          <div class="mushroom-info">
+            <div class="mushroom-name">${m.name}</div>
+            <div class="mushroom-latin">${m.latin}</div>
+            <div class="mushroom-tags">
+              <span class="tag ${edibleInfo.cls}">${edibleInfo.text}</span>
+              <span class="tag tag-relation">${m.relation}</span>
+            </div>
+          </div>
+          <div class="mushroom-score-col">
+            <div class="mushroom-score" style="color:${barColor}">${pct}%</div>
+            <div class="score-bar-mini">
+              <div class="score-bar-fill-mini" style="width:${Math.max(pct,2)}%;background:${barColor}"></div>
+            </div>
+            <div class="score-label-mini">${scoreToLabel(pct)}</div>
+          </div>
+        </div>
+        <div class="mushroom-detail hidden" id="${id}">
+          <p class="mushroom-desc">${m.description || ''}</p>
+          ${m.danger ? '<p class="danger-warning">⚠️ Ten gatunek jest śmiertelnie niebezpieczny!</p>' : ''}
+          <div class="score-components">
+            <div class="sc-item" title="Dopasowanie do drzewostanu">
+              <span class="sc-label">🌳 Drzewostan</span>
+              <span class="sc-val" style="color:${barColor}">${cmp.tree ?? '—'}%</span>
+            </div>
+            <div class="sc-item" title="Sezon">
+              <span class="sc-label">📅 Sezon</span>
+              <span class="sc-val">${cmp.season ?? '—'}%</span>
+            </div>
+            <div class="sc-item" title="Warunki pogodowe: temp + opady + wilgotność">
+              <span class="sc-label">🌦️ Pogoda</span>
+              <span class="sc-val">${cmp.weather ?? '—'}%</span>
+            </div>
+            <div class="sc-item" title="Naturalna pospolitość gatunku">
+              <span class="sc-label">🌏 Pospolitość</span>
+              <span class="sc-val">${cmp.prevalence ?? '—'}%</span>
+            </div>
+          </div>
+          ${m.ecology ? `
+          <div class="ecology-row">
+            <span>🌡️ ${m.ecology.tempMin}–${m.ecology.tempMax}°C</span>
+            <span>💧 min ${m.ecology.rain14min} mm/14d</span>
+            <span>🕓 +${m.ecology.daysAfter?.[0]}–${m.ecology.daysAfter?.[1]} dni po deszczu</span>
+          </div>` : ''}
+          <div class="wiki-row">
+            <a class="wiki-link"
+               href="https://pl.wikipedia.org/wiki/${encodeURIComponent(m.latin.replace(/ /g,'_'))}"
+               target="_blank" rel="noopener noreferrer"
+               onclick="event.stopPropagation()"
+               title="Otwórz artykuł na Wikipedii">
+              <svg class="wiki-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8 5 8h-4v4h-2z"/>
+              </svg>
+              Wikipedia — <em>${m.latin}</em>
+            </a>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  let html = '';
+  if (edible.length)  html += `<div class="mushroom-group-label">🍄 Jadalne (${edible.length})</div>${renderGroup(edible, 12)}`;
+  if (caution.length) html += `<div class="mushroom-group-label warn">⚠️ Uwaga / niejadalne (${caution.length})</div>${renderGroup(caution, 6)}`;
+  if (toxic.length)   html += `<div class="mushroom-group-label danger">☠️ Trujące — ostrzeżenie (${toxic.length})</div>${renderGroup(toxic, 8)}`;
+
+  el.innerHTML = html;
+}
+
+function renderLoading() {
+  $('forest-info').innerHTML = '<div class="loading-skeleton"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>';
+  $('weather-info').innerHTML = '<div class="loading-skeleton"><div class="skeleton-line"></div></div>';
+  $('mushroom-list').innerHTML = [1,2,3].map(() =>
+    '<div class="loading-skeleton mushroom-skeleton"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>'
+  ).join('');
+}
+
+// ── Panel UI ───────────────────────────────────────────────────────
+function showPanel(open) {
+  state.panelOpen = open;
+  $('bottom-panel').classList.toggle('open', open);
+  $('panel-backdrop').classList.toggle('active', open);
+}
+
+function togglePanel() {
+  showPanel(!state.panelOpen);
+}
+
+function closePanel() {
+  showPanel(false);
+}
+
+// ── Szczegóły grzyba (toggle) ──────────────────────────────────────
+window.toggleMushroomDetail = function(id) {
+  // id to bezpośrednio "d-{m.id}" przekazane z onclick
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('hidden');
+};
+
+// ── Helpers UI ─────────────────────────────────────────────────────
+function setStatus(msg, type) {
+  const el = $('status-bar');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `status-bar ${type}`;
+  el.style.display = msg ? 'flex' : 'none';
+}
+
+function showError(msg) {
+  setStatus(msg, 'error');
+  console.error('[App]', msg);
+}
+
+function getGpsError(e) {
+  if (e.code === 1) return 'Brak zgody na lokalizację. Włącz GPS w ustawieniach.';
+  if (e.code === 2) return 'Nie można określić lokalizacji. Sprawdź GPS.';
+  if (e.code === 3) return 'Przekroczono czas oczekiwania na GPS.';
+  return 'Błąd GPS: ' + (e.message || 'nieznany');
+}
+
+let forestLayerVisible = true;
+function onLayerToggle() {
+  forestLayerVisible = !forestLayerVisible;
+  $('btn-layer-toggle').classList.toggle('active', forestLayerVisible);
+  if (window.toggleForestLayerGlobal) window.toggleForestLayerGlobal(forestLayerVisible);
+}
+
+function onHeatmapToggle() {
+  const nowVisible = !isHeatmapVisible();
+  const lat = state.pinMode ? (state.pinLat || state.lat) : state.lat;
+  const lng = state.pinMode ? (state.pinLng || state.lng) : state.lng;
+
+  if (lat && lng) {
+    setHeatmapCenter(lat, lng);
+  }
+  if (state.weatherData) {
+    updateHeatmap(state.weatherData, new Date().getMonth() + 1);
+  }
+
+  toggleHeatmap(nowVisible);
+  $('btn-heatmap').classList.toggle('active', nowVisible);
+  $('heatmap-legend').classList.toggle('hidden', !nowVisible);
+
+  if (nowVisible && !state.weatherData) {
+    setStatus('Najpierw załaduj lokalizację — heatmapa potrzebuje danych pogodowych', 'info');
+  }
+}
