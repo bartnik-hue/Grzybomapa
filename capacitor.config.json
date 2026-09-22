@@ -1,7 +1,7 @@
 {
   "appId": "pl.grzybomap.app",
   "appName": "GrzyboMapa",
-  "webDir": "www",
+  "webDir": "docs",
   "server": {
     "androidScheme": "https"
   },
