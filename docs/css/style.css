@@ -933,7 +933,28 @@ html, body {
   background: rgba(56, 189, 248, 0.75);
   box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
 }
+.ftl-dot-mixed {
+  background: rgba(192, 132, 252, 0.75);
+  box-shadow: 0 0 6px rgba(192, 132, 252, 0.4);
+}
+.ftl-item-mixed {
+  opacity: 0.6;
+}
 .ftl-note {
   margin-top: 8px; font-size: 10px; color: var(--text-muted);
   border-top: 1px solid var(--border); padding-top: 6px;
 }
+
+/* Tooltip wydzielenia leśnego */
+.forest-type-tooltip {
+  background: rgba(11,22,18,0.92) !important;
+  border: 1px solid rgba(74,222,128,0.3) !important;
+  color: var(--text-primary, #e8f5e9) !important;
+  font-size: 12px !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  border-radius: 8px !important;
+  padding: 5px 10px !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
+  line-height: 1.4 !important;
+}
+.forest-type-tooltip::before { display: none !important; }
