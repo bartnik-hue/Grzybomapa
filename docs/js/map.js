@@ -8,9 +8,12 @@ let userMarker = null;
 let accuracyCircle = null;
 let forestBoundaryLayer = null;
 let wmsLayer = null;
+let wmsLayerDeciduous = null;   // nakładka lasów liściastych
+let wmsLayerConiferous = null;  // nakładka lasów iglastych
 let pinMarker = null;        // marker ręcznie wybranego punktu
 let pinModeActive = false;  // czy tryb kliknij-na-mapę jest włączony
 let onMapClickCb = null;    // callback(lat, lng) przy kliknięciu
+
 
 const WMS_BDL_URL = 'https://mapserver.bdl.lasy.gov.pl/ArcGIS/services/WMS_BDL_Mapa_turystyczna/MapServer/WMSServer';
 const WMS_DRZEWOSTANY = 'https://mapserver.bdl.lasy.gov.pl/ArcGIS/services/WMS_BDL_Drzewostany/MapServer/WMSServer';
@@ -38,6 +41,10 @@ export function initMap(containerId = 'map') {
   // Warstwa WMS — Drzewostany LP (nakładka z typem drzewostanu)
   addForestWMSLayer();
 
+  // Nakładki kolorowe wg typu lasu (domyślnie ukryte)
+  addDeciduousLayer();
+  addConiferousLayer();
+
   // Obsługa kliknięcia mapy (tryb pinezki / próbnik)
   map.on('click', (e) => {
     const { lat, lng } = e.latlng;
@@ -49,7 +56,7 @@ export function initMap(containerId = 'map') {
 }
 
 /**
- * Dodaj warstwę WMS drzewostanów
+ * Dodaj warstwę WMS drzewostanów (ogólna)
  */
 function addForestWMSLayer() {
   try {
@@ -63,6 +70,61 @@ function addForestWMSLayer() {
     }).addTo(map);
   } catch (e) {
     console.warn('[Map] WMS layer failed:', e);
+  }
+}
+
+/**
+ * Dodaj nakładkę lasów liściastych (Drzewostany LP, warstwa 0, zielony tint)
+ * Używa osobnego panelu Leaflet z filtrem CSS hue-rotate dla odróżnienia koloru
+ */
+function addDeciduousLayer() {
+  try {
+    // Utwórz dedykowany pane z filtrem koloru dla liściastych (ciepła zieleń)
+    if (!map.getPane('deciduousPane')) {
+      map.createPane('deciduousPane');
+      map.getPane('deciduousPane').style.zIndex = 350;
+      map.getPane('deciduousPane').style.filter =
+        'sepia(0.5) saturate(2) hue-rotate(60deg) brightness(1.1) opacity(0.7)';
+    }
+    wmsLayerDeciduous = L.tileLayer.wms(WMS_DRZEWOSTANY, {
+      layers: '0',
+      format: 'image/png',
+      transparent: true,
+      opacity: 1,
+      attribution: '© Lasy Państwowe BDL',
+      maxZoom: 19,
+      pane: 'deciduousPane',
+    });
+    // NIE dodajemy do mapy — warstwa jest domyślnie ukryta
+  } catch (e) {
+    console.warn('[Map] Deciduous WMS layer failed:', e);
+  }
+}
+
+/**
+ * Dodaj nakładkę lasów iglastych (Drzewostany LP, warstwa 0, niebieski/fioletowy tint)
+ */
+function addConiferousLayer() {
+  try {
+    // Utwórz dedykowany pane z filtrem koloru dla iglastych (niebieskawa zieleń)
+    if (!map.getPane('coniferousPane')) {
+      map.createPane('coniferousPane');
+      map.getPane('coniferousPane').style.zIndex = 345;
+      map.getPane('coniferousPane').style.filter =
+        'sepia(0.6) saturate(2.2) hue-rotate(190deg) brightness(1.05) opacity(0.7)';
+    }
+    wmsLayerConiferous = L.tileLayer.wms(WMS_DRZEWOSTANY, {
+      layers: '0',
+      format: 'image/png',
+      transparent: true,
+      opacity: 1,
+      attribution: '© Lasy Państwowe BDL',
+      maxZoom: 19,
+      pane: 'coniferousPane',
+    });
+    // NIE dodajemy do mapy — warstwa jest domyślnie ukryta
+  } catch (e) {
+    console.warn('[Map] Coniferous WMS layer failed:', e);
   }
 }
 
@@ -150,6 +212,24 @@ export function toggleForestLayer(visible) {
   if (!map || !wmsLayer) return;
   if (visible) map.addLayer(wmsLayer);
   else map.removeLayer(wmsLayer);
+}
+
+/**
+ * Przełącz nakładkę lasów liściastych (żółto-zielona)
+ */
+export function toggleDeciduousLayer(visible) {
+  if (!map || !wmsLayerDeciduous) return;
+  if (visible) map.addLayer(wmsLayerDeciduous);
+  else map.removeLayer(wmsLayerDeciduous);
+}
+
+/**
+ * Przełącz nakładkę lasów iglastych (niebieska)
+ */
+export function toggleConiferousLayer(visible) {
+  if (!map || !wmsLayerConiferous) return;
+  if (visible) map.addLayer(wmsLayerConiferous);
+  else map.removeLayer(wmsLayerConiferous);
 }
 
 /**

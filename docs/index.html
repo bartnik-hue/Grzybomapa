@@ -48,6 +48,12 @@
       <button id="btn-layer-toggle" class="icon-btn active" title="Pokaż/ukryj warstwę drzewostanów" aria-label="Przełącz warstwę leśną">
         🗺️
       </button>
+      <button id="btn-deciduous" class="icon-btn" title="Nakładka lasów liściastych (żółto-zielona)" aria-label="Pokaż lasy liściaste">
+        🌳
+      </button>
+      <button id="btn-coniferous" class="icon-btn" title="Nakładka lasów iglastych (niebieska)" aria-label="Pokaż lasy iglaste">
+        🌲
+      </button>
       <button id="btn-heatmap" class="icon-btn" title="Mapa cieplna warunków grzybobrania" aria-label="Włącz mapę cieplną">
         🌡️
       </button>
@@ -88,6 +94,22 @@
       Teren × Pogoda × Sezon &middot; <span id="heatmap-status">ustaw lokalizację aby aktywować</span>
     </div>
     <div id="heatmap-loading" class="heatmap-loading-bar hidden"></div>
+  </div>
+
+  <!-- Legenda nakładek typów lasu (ukryta domyślnie) -->
+  <div id="forest-type-legend" class="forest-type-legend hidden" aria-label="Legenda typów lasu">
+    <div class="ftl-title">🌿 Typ drzewostanu</div>
+    <div class="ftl-items">
+      <div class="ftl-item" id="ftl-deciduous">
+        <span class="ftl-dot ftl-dot-deciduous"></span>
+        <span>🌳 Liściaste</span>
+      </div>
+      <div class="ftl-item" id="ftl-coniferous">
+        <span class="ftl-dot ftl-dot-coniferous"></span>
+        <span>🌲 Iglaste</span>
+      </div>
+    </div>
+    <div class="ftl-note">Nakładka z danych BDL · Lasy Państwowe</div>
   </div>
 
   <!-- Backdrop -->

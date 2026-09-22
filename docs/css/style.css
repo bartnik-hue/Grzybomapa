@@ -877,3 +877,63 @@ html, body {
   box-shadow: none !important;
 }
 .heatmap-rect-tooltip::before { display: none !important; }
+
+/* ── Przyciski nakładek typów lasu ───────────────────────────────── */
+#btn-deciduous.active-deciduous {
+  background: rgba(134, 239, 100, 0.2) !important;
+  color: #86ef64 !important;
+  border-color: rgba(134, 239, 100, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(134, 239, 100, 0.12), 0 0 12px rgba(134, 239, 100, 0.2);
+}
+
+#btn-coniferous.active-coniferous {
+  background: rgba(56, 189, 248, 0.18) !important;
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12), 0 0 12px rgba(56, 189, 248, 0.2);
+}
+
+/* ── Legenda nakładek typów lasu ─────────────────────────────────── */
+.forest-type-legend {
+  position: absolute;
+  bottom: 90px;
+  right: 16px;
+  z-index: 600;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  min-width: 170px;
+  box-shadow: var(--shadow-card);
+  animation: fadeSlideUp 0.35s ease;
+}
+.ftl-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+  color: var(--text-primary); margin-bottom: 8px;
+}
+.ftl-items {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ftl-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-secondary);
+  transition: opacity 0.3s ease;
+}
+.ftl-dot {
+  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.ftl-dot-deciduous {
+  background: rgba(134, 239, 100, 0.75);
+  box-shadow: 0 0 6px rgba(134, 239, 100, 0.5);
+}
+.ftl-dot-coniferous {
+  background: rgba(56, 189, 248, 0.75);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+}
+.ftl-note {
+  margin-top: 8px; font-size: 10px; color: var(--text-muted);
+  border-top: 1px solid var(--border); padding-top: 6px;
+}
