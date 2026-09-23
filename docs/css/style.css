@@ -729,6 +729,7 @@ html, body {
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.03);
   transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
 .wiki-link:hover {
   color: #fff;
   border-color: #a0a0a0;
@@ -818,7 +819,7 @@ html, body {
 
 /* ── Responsywność — większe ekrany ─────────────────── */
 @media (min-width: 480px) {
-  #bottom-panel { max-width: 480px; left: 50%; transform: translateX(-50%) translateY(100%); border-radius: var(--radius-xl); bottom: 16px; }
+  #bottom-panel { width: 100%; max-width: 480px; left: 50%; right: auto; transform: translateX(-50%) translateY(100%); border-radius: var(--radius-xl); bottom: 16px; }
   #bottom-panel.open { transform: translateX(-50%) translateY(0); }
   #panel-backdrop { border-radius: 0; }
 }
