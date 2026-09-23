@@ -258,14 +258,19 @@ function addForestWMSLayer() {
 
 /**
  * Utwórz warstwę WMS szlaków turystycznych LP BDL
- * Warstwy: 18=szlaki turystyczne, 19=ścieżki konne, 20+21=ścieżki dydaktyczne
+ * Prawdziwe ID wg ArcGIS REST API:
+ *   18 = "Szlaki turystyczne" (Group Layer — zawiera podwarstwy)
+ *   19 = "scieżka konna" (Polyline)
+ *   20 = "Ścieżki dydaktyczne" (Polyline, skala do 1:150k)
+ *   21 = "Ścieżki dydaktyczne" (Polyline, skala > 1:150k)
+ * Skala minScale: 1500000 → widoczne przy zoom >= 9 (całe województwo)
  */
 function createTrailsWMSLayer() {
   return L.tileLayer.wms(WMS_BDL_URL, {
     layers: '18,19,20,21',
     format: 'image/png',
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.9,
     attribution: '© Lasy Państwowe BDL — Mapa Turystyczna',
     maxZoom: 19,
     version: '1.3.0',
