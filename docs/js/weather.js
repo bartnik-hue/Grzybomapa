@@ -76,6 +76,7 @@ async function fetchForecast(lat, lng) {
     latitude: lat,
     longitude: lng,
     daily: [
+      'weathercode',
       'precipitation_sum',
       'temperature_2m_max',
       'temperature_2m_min',

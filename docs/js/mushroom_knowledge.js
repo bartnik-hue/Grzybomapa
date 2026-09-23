@@ -62,8 +62,9 @@ export const MUSHROOM_DATABASE = [
     name: 'Borowik szlachetny',
     latin: 'Boletus edulis',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Król polskich lasów. Brązowy aksamitny kapelusz, biały trzon z delikatną siateczką. Rośnie samotnie lub małymi grupkami pod sosnami, świerkami i bukami. Niezbędny opad 3-7 dni przed zbiorem.',
+    description: 'Król polskich lasów. Brązowy aksamitny kapelusz, biały trzon z delikatną siateczką. Rośnie pod sosnami, świerkami, dębami i bukami w dojrzałych drzewostanach (>40 lat).',
     trees: ['So', 'Sw', 'Db', 'Bk', 'Gb', 'Md', 'Jd'], treeStrict: false,
+    agePref: 'old',
     habitats: ['BŚW','BMŚ','LMŚ','LŚW','BW','BMW'],
     months: [6,7,8,9,10], peakMonths: [8,9],
     ecology: { tempMin: 8, tempMax: 22, tempDayMax: 26,
@@ -78,6 +79,7 @@ export const MUSHROOM_DATABASE = [
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
     description: 'Czekoladowobrązowy kapelusz, rurki błękitnieją po uszkodzeniu. Bardziej odporny na suszę niż borowik. Jeden z najobficiej owocujących gatunków lasów iglastych.',
     trees: ['So', 'Sw', 'Md', 'Jd'], treeStrict: false,
+    agePref: 'mature',
     habitats: ['BŚW','Bw','BMŚ','BMW'],
     months: [7,8,9,10,11], peakMonths: [8,9,10],
     ecology: { tempMin: 5, tempMax: 24, tempDayMax: 28,
@@ -92,6 +94,7 @@ export const MUSHROOM_DATABASE = [
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
     description: 'Letni borowik lasów liściastych — pojawia się jako jeden z pierwszych. Jaśniejszy kapelusz niż borowik szlachetny, wyraźna siateczka na całym trzonie. Lubi ciepłe lata.',
     trees: ['Db', 'Bk', 'Gb', 'Lp'], treeStrict: false,
+    agePref: 'mature',
     habitats: ['LŚW','LMŚ','LW'],
     months: [5,6,7,8,9], peakMonths: [6,7],
     ecology: { tempMin: 12, tempMax: 26, tempDayMax: 30,
@@ -106,7 +109,8 @@ export const MUSHROOM_DATABASE = [
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
     description: 'Wczesnoletni borowik typowy dla borów sosnowych. Ciemnobrązowy kapelusz z czerwonawym odcieniem, trzon z delikatną siateczką u góry. Jeden z pierwszych borowików sezonu.',
     trees: ['So'], treeStrict: true,
-    habitats: ['BŚW','Bw','BB','BMŚ'],
+    agePref: 'old',
+    habitats: ['BŚW','Bw','BB','BMŚ','BS','BR'],
     months: [5,6,7,8,9,10], peakMonths: [6,7,8],
     ecology: { tempMin: 6, tempMax: 20, tempDayMax: 24,
       rain14min: 15, impulseMin: 8, daysAfter: [3,8],
@@ -120,6 +124,7 @@ export const MUSHROOM_DATABASE = [
     edible: 'trujące', danger: true, icon: '☠️', relation: 'mikoryzowy',
     description: 'TRUJĄCY — powoduje silne zatrucia. Biały kapelusz, czerwono-pomarańczowy trzon, silnie niebieskieje. Rośnie wyłącznie pod dębami i bukami na ciepłych, wapiennych stanowiskach. Rzadki.',
     trees: ['Db', 'Bk', 'Lp'], treeStrict: true,
+    agePref: 'mature',
     habitats: ['LŚW','LMŚ'],
     months: [6,7,8,9], peakMonths: [7,8],
     ecology: { tempMin: 14, tempMax: 28, tempDayMax: 32,
@@ -136,9 +141,10 @@ export const MUSHROOM_DATABASE = [
     name: 'Maślak zwyczajny',
     latin: 'Suillus luteus',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Śluzowaty, lepki kapelusz kasztanowy, wyraźny fioletowy pierścień. WYŁĄCZNIE pod sosnami. Jeden z najliczniej owocujących grzybów borów sosnowych. Dobry do zup po obieraniu skórki.',
+    description: 'Śluzowaty, lepki kapelusz kasztanowy, wyraźny fioletowy pierścień. WYŁĄCZNIE pod sosnami, zwłaszcza w młodych borach i młodnikach. Dobry do zup po obieraniu skórki.',
     trees: ['So'], treeStrict: true,
-    habitats: ['BŚW','Bw','BMŚ','BMW'],
+    agePref: 'young',
+    habitats: ['BŚW','Bw','BMŚ','BMW','BS'],
     months: [7,8,9,10,11], peakMonths: [9,10],
     ecology: { tempMin: 7, tempMax: 20, tempDayMax: 24,
       rain14min: 15, impulseMin: 6, daysAfter: [2,6],
@@ -152,7 +158,8 @@ export const MUSHROOM_DATABASE = [
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
     description: 'Oliwkowobrązowy kapelusz, bez pierścienia. Porowaty hymenofor zmienia barwę na niebieską. Rośnie pod sosnami i świerkami, bardziej suszy-odporny niż maślak zwyczajny.',
     trees: ['So', 'Sw'], treeStrict: true,
-    habitats: ['BŚW','Bw','BMW','BMŚ'],
+    agePref: 'young',
+    habitats: ['BŚW','Bw','BMW','BMŚ','BS','BR'],
     months: [7,8,9,10], peakMonths: [8,9],
     ecology: { tempMin: 6, tempMax: 22, tempDayMax: 26,
       rain14min: 12, impulseMin: 5, daysAfter: [2,7],
@@ -166,7 +173,8 @@ export const MUSHROOM_DATABASE = [
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
     description: 'Żółtopomarańczowy, śluzowaty. Rośnie WYŁĄCZNIE pod modrzewiem — jeden z nielicznych grzybów tak ściśle przywiązanych do jednego drzewa. Smaczny po obieraniu skórki.',
     trees: ['Md'], treeStrict: true,
-    habitats: [],
+    agePref: 'young',
+    habitats: ['BMŚ','LMŚ','LŚW'],
     months: [6,7,8,9,10], peakMonths: [8,9],
     ecology: { tempMin: 7, tempMax: 22, tempDayMax: 26,
       rain14min: 12, impulseMin: 6, daysAfter: [2,6],
@@ -178,9 +186,10 @@ export const MUSHROOM_DATABASE = [
     name: 'Maślak ziarnisty',
     latin: 'Suillus granulatus',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Jasnobrązowy bez pierścienia, rurki wydzielają mleczne kropelki. Pojawia się wiosną i latem wcześniej niż inne maślaki. Tylko w młodych borach sosnowych.',
+    description: 'Jasnobrązowy bez pierścienia, rurki wydzielają mleczne kropelki. Pojawia się wiosną i latem wcześniej niż inne maślaki. Głównie w młodnikach sosnowych.',
     trees: ['So'], treeStrict: true,
-    habitats: ['BŚW','Bw'],
+    agePref: 'young',
+    habitats: ['BŚW','Bw','BS'],
     months: [5,6,7,8,9], peakMonths: [6,7],
     ecology: { tempMin: 8, tempMax: 22, tempDayMax: 26,
       rain14min: 12, impulseMin: 6, daysAfter: [2,5],
@@ -196,8 +205,9 @@ export const MUSHROOM_DATABASE = [
     name: 'Kurka (pieprznik jadalny)',
     latin: 'Cantharellus cibarius',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Złotożółta, fałdziesta hymenofor zamiast blaszek. Zapach moreli. Preferuje wilgotne, muliste gleby w lasach mieszanych i liściastych. Nie jest selektywna co do drzew, ale wymaga stabilnej wilgotności.',
-    trees: ['Db', 'Bk', 'Gb', 'Brz', 'So'], treeStrict: false,
+    description: 'Złotożółta, fałdziesta hymenofor zamiast blaszek. Zapach moreli. Wymaga wykształconej ściółki mszystej w starszych drzewostanach (>35 lat).',
+    trees: ['So', 'Sw', 'Db', 'Bk', 'Gb', 'Brz'], treeStrict: false,
+    agePref: 'old',
     habitats: ['LŚW','LMŚ','LW','BŚW','BMW'],
     months: [6,7,8,9], peakMonths: [7,8],
     ecology: { tempMin: 10, tempMax: 22, tempDayMax: 26,
@@ -212,6 +222,7 @@ export const MUSHROOM_DATABASE = [
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
     description: 'Mała trąbka, żółtonogi, brązowy kapelusz z dziurką. Masowo wyrasta późną jesienią w wilgotnych świerczynach i buczyna. Odporny na przymrozki.',
     trees: ['Sw', 'Bk', 'Db'], treeStrict: false,
+    agePref: 'mature',
     habitats: ['LŚW','LMŚ','LW','BMW'],
     months: [9,10,11], peakMonths: [10,11],
     ecology: { tempMin: 3, tempMax: 15, tempDayMax: 18,
@@ -228,8 +239,9 @@ export const MUSHROOM_DATABASE = [
     name: 'Koźlarz babka',
     latin: 'Leccinum scabrum',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Specyficzny towarzysz WYŁĄCZNIE brzóz. Brązowy kapelusz, czarne łuski na jasnym trzonie. Pojawia się kiedy tylko w lesie jest brzoza, nawet młoda. Czernieje podczas gotowania.',
+    description: 'Specyficzny towarzysz WYŁĄCZNIE brzóz. Brązowy kapelusz, czarne łuski na jasnym trzonie. Pojawia się zawsze tam, gdzie rosną brzozy.',
     trees: ['Brz'], treeStrict: true,
+    agePref: 'mature',
     habitats: ['BW','Bw','BMŚ','LMŚ','LW'],
     months: [6,7,8,9,10], peakMonths: [7,8,9],
     ecology: { tempMin: 7, tempMax: 22, tempDayMax: 26,
@@ -242,9 +254,10 @@ export const MUSHROOM_DATABASE = [
     name: 'Koźlarz czerwony',
     latin: 'Leccinum aurantiacum',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Pomarańczowoczerwony kapelusz — nie do pomylenia. Rośnie WYŁĄCZNIE pod osikami i czasem topolami. Silnie czernieje podczas gotowania — to normalny objaw.',
+    description: 'Pomarańczowoczerwony kapelusz — nie do pomylenia. Rośnie WYŁĄCZNIE pod osikami i topolami.',
     trees: ['Os', 'Tp'], treeStrict: true,
-    habitats: ['LMŚ','LŚW','LW'],
+    agePref: 'mature',
+    habitats: ['LMŚ','LŚW','LW','BMŚ'],
     months: [6,7,8,9,10], peakMonths: [7,8],
     ecology: { tempMin: 8, tempMax: 23, tempDayMax: 27,
       rain14min: 15, impulseMin: 8, daysAfter: [3,7],
@@ -256,8 +269,9 @@ export const MUSHROOM_DATABASE = [
     name: 'Koźlarz grabowy',
     latin: 'Leccinum pseudoscabrum',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Bardzo podobny do koźlarza babki, ale rośnie pod grabem i dębem. Szarobrązowy kapelusz. Czernieje przy gotowaniu.',
+    description: 'Rośnie WYŁĄCZNIE pod grabem i dębem w lasach liściastych. Pofałdowany szarobrązowy kapelusz.',
     trees: ['Gb', 'Db'], treeStrict: true,
+    agePref: 'mature',
     habitats: ['LŚW','LMŚ'],
     months: [6,7,8,9,10], peakMonths: [7,8,9],
     ecology: { tempMin: 8, tempMax: 22, tempDayMax: 26,
@@ -274,9 +288,10 @@ export const MUSHROOM_DATABASE = [
     name: 'Rydz (mleczaj rydz)',
     latin: 'Lactarius deliciosus',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'mikoryzowy',
-    description: 'Pomarańczowy, mleczko karminowo-pomarańczowe. Ceniony szczególnie na smażenie. Rośnie WYŁĄCZNIE pod sosnami, przeważnie w borach sosnowych z mszystą ściółką.',
+    description: 'Pomarańczowy, mleczko marchewkowo-pomarańczowe. Rośnie WYŁĄCZNIE pod sosnami, najliczniej w młodnikach sosnowych na piaszczystym podłożu.',
     trees: ['So'], treeStrict: true,
-    habitats: ['BŚW','Bw','BMŚ'],
+    agePref: 'young',
+    habitats: ['BŚW','Bw','BMŚ','BS'],
     months: [8,9,10], peakMonths: [9,10],
     ecology: { tempMin: 5, tempMax: 18, tempDayMax: 22,
       rain14min: 18, impulseMin: 8, daysAfter: [3,8],
@@ -644,66 +659,196 @@ export const MUSHROOM_DATABASE = [
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Pobierz listę grzybów dla konkretnej kompozycji drzewostanu
- * @param {Array} speciesWithPct — [{code:'So',pct:60},{code:'Db',pct:40}]
- *                lub [{code:'So'}] jeśli bez procentów
- * @param {string} habitatCode — np. "BŚW", "LMŚ"
- * @returns {Array} lista grzybów z wagą dopasowania do drzewostanu
+ * Wnioskuj prawdopodobny skład drzewostanu na podstawie typu siedliskowego lasu (gdy brak kodu w OGC)
  */
-export function getMushroomsForStand(speciesWithPct = [], habitatCode = null) {
-  const specCodes = speciesWithPct.map(s =>
-    (s.code || s).charAt(0).toUpperCase() + (s.code || s).slice(1).toLowerCase()
-  );
-  const totalPct  = speciesWithPct.reduce((s, x) => s + (x.pct || 0), 0) || 100;
+export function inferSpeciesFromHabitat(habitatCode) {
+  if (!habitatCode) {
+    return [{ code: 'So', pct: 60 }, { code: 'Db', pct: 25 }, { code: 'Brz', pct: 15 }];
+  }
+  const code = habitatCode.toUpperCase().replace(/\s/g, '');
+  if (code.includes('BS') || code.includes('BR')) {
+    return [{ code: 'So', pct: 90 }, { code: 'Brz', pct: 10 }];
+  }
+  if (code.includes('BŚW') || code.includes('BSW')) {
+    return [{ code: 'So', pct: 85 }, { code: 'Brz', pct: 15 }];
+  }
+  if (code.includes('BMŚ') || code.includes('BMSW')) {
+    return [{ code: 'So', pct: 60 }, { code: 'Db', pct: 25 }, { code: 'Brz', pct: 15 }];
+  }
+  if (code.includes('BMW') || code.includes('BW') || code.includes('BB')) {
+    return [{ code: 'So', pct: 55 }, { code: 'Sw', pct: 30 }, { code: 'Brz', pct: 15 }];
+  }
+  if (code.includes('LMŚ') || code.includes('LMSW')) {
+    return [{ code: 'Db', pct: 40 }, { code: 'Bk', pct: 30 }, { code: 'So', pct: 20 }, { code: 'Gb', pct: 10 }];
+  }
+  if (code.includes('LŚW') || code.includes('LSW')) {
+    return [{ code: 'Db', pct: 45 }, { code: 'Bk', pct: 35 }, { code: 'Gb', pct: 20 }];
+  }
+  if (code.includes('OL') || code.includes('LŁ') || code.includes('LL')) {
+    return [{ code: 'Ol', pct: 75 }, { code: 'Js', pct: 15 }, { code: 'Brz', pct: 10 }];
+  }
+  return [{ code: 'So', pct: 60 }, { code: 'Db', pct: 25 }, { code: 'Brz', pct: 15 }];
+}
+
+/**
+ * Pobierz listę grzybów dla konkretnej kompozycji drzewostanu, siedliska i wieku lasu
+ * @param {Array} speciesWithPct — [{code:'So',pct:60},{code:'Db',pct:40}]
+ * @param {string} habitatCode — np. "BŚW", "LMŚ"
+ * @param {number|string} forestAge — wiek drzewostanu w latach (np. 15, 80)
+ * @returns {Array} lista grzybów z wagami ekologicznymi
+ */
+export function getMushroomsForStand(speciesWithPct = [], habitatCode = null, forestAge = null) {
+  let specs = speciesWithPct;
+  if (!specs || specs.length === 0) {
+    specs = inferSpeciesFromHabitat(habitatCode);
+  }
+
+  const totalPct = specs.reduce((s, x) => s + (x.pct || 0), 0) || 100;
+  const age = forestAge ? parseInt(forestAge, 10) : null;
+  const hCode = (habitatCode || '').toUpperCase().replace(/\s/g, '');
 
   return MUSHROOM_DATABASE
     .map(m => {
-      // 1. Wynik dopasowania do drzew (0..1)
+      // 1. Dopasowanie mikoryzowe drzewostanu (0..1.2)
       let treeMatch = 0;
+      let matchedTreeName = '';
+
       if (!m.trees || m.trees.length === 0) {
-        treeMatch = 1.0; // Saprotrofy i generaliści
+        // Saprotrofy i generaliści
+        treeMatch = 0.85;
       } else if (m.treeStrict) {
-        // ŚCIŚLE przywiązany — musi być jego drzewo
-        const hit = speciesWithPct.find(s => {
+        // ŚCIŚLE powiązany — musi mieć swojego partnera w drzewostanie!
+        const hit = specs.find(s => {
           const norm = (s.code || s).charAt(0).toUpperCase() + (s.code || s).slice(1).toLowerCase();
           return m.trees.includes(norm);
         });
-        treeMatch = hit ? (hit.pct || 10) / Math.max(totalPct, 1) : 0;
+
+        if (hit) {
+          const norm = (hit.code || hit).charAt(0).toUpperCase() + (hit.code || hit).slice(1).toLowerCase();
+          const treeInfo = TREE_SPECIES[norm];
+          matchedTreeName = treeInfo?.name || norm;
+          const share = (hit.pct || 25) / totalPct;
+          // Jeśli udział drzewa jest znaczący (>20%), grzyb dostaje niemal pełne dopasowanie
+          treeMatch = Math.min(0.4 + share * 0.9, 1.25);
+        } else {
+          // Brak drzewa żywicielskiego = grzyb ściśle mikoryzowy nie wystąpi!
+          treeMatch = 0;
+        }
       } else {
-        // Preferencja — suma procentowego udziału ulubionych drzew
-        const matchPct = speciesWithPct
+        // Preferencja niespecyficzna — suma udziałów ulubionych drzew
+        let hitTreeNames = [];
+        const matchPct = specs
           .filter(s => {
             const norm = (s.code || s).charAt(0).toUpperCase() + (s.code || s).slice(1).toLowerCase();
-            return m.trees.includes(norm);
+            const hit = m.trees.includes(norm);
+            if (hit) {
+              const tInfo = TREE_SPECIES[norm];
+              hitTreeNames.push(tInfo?.name || norm);
+            }
+            return hit;
           })
-          .reduce((sum, s) => sum + (s.pct || 10), 0);
-        treeMatch = Math.min(matchPct / Math.max(totalPct, 1), 1.0);
+          .reduce((sum, s) => sum + (s.pct || 15), 0);
+
+        if (matchPct > 0) {
+          matchedTreeName = hitTreeNames.slice(0, 2).join(', ');
+          treeMatch = Math.min(0.35 + (matchPct / totalPct) * 0.75, 1.1);
+        } else {
+          treeMatch = 0.12; // toleruje brak, ale bardzo rzadki
+        }
       }
 
-      // 2. Dopasowanie siedliska (bonus +0.15 gdy pasuje)
+      // Jeśli grzyb ściśle zależy od drzewa i go nie ma — natychmiast odpada
+      if (m.treeStrict && treeMatch === 0) {
+        return null;
+      }
+
+      // 2. Dopasowanie wieku drzewostanu (ageFactor: 0.15 .. 1.4)
+      let ageFactor = 1.0;
+      let ageNote = '';
+
+      if (age !== null && age > 0) {
+        const pref = m.agePref || 'any';
+        if (pref === 'young') {
+          // Grzyby młodnikowe (maślaki, rydze)
+          if (age <= 25) {
+            ageFactor = 1.40;
+            ageNote = `🌱 Młodnik (${age} l.) — szczyt owocowania`;
+          } else if (age <= 45) {
+            ageFactor = 0.90;
+          } else {
+            ageFactor = 0.40;
+            ageNote = `Drzewostan dojrzały — maślaki rzadsze`;
+          }
+        } else if (pref === 'old') {
+          // Grzyby starodrzewu (borowik szlachetny, kurka, soplówka, szmaciak)
+          if (age <= 15) {
+            ageFactor = 0.15;
+            ageNote = `⚠️ Za młody las (${age} l.) — brak mikoryzy starodrzewu`;
+          } else if (age <= 35) {
+            ageFactor = 0.60;
+          } else if (age <= 120) {
+            ageFactor = 1.35;
+            ageNote = `🌲 Starodrzew (${age} l.) — optymalne siedlisko`;
+          } else {
+            ageFactor = 1.15;
+          }
+        } else if (pref === 'mature') {
+          // Podgrzybki, krasnoborowiki, koźlarze
+          if (age <= 15) ageFactor = 0.55;
+          else if (age <= 80) ageFactor = 1.25;
+          else ageFactor = 1.05;
+        }
+      }
+
+      // 3. Dopasowanie siedliska (habitatBonus)
       let habitatBonus = 0;
-      if (habitatCode && m.habitats?.length) {
-        const hCode = (habitatCode || '').toUpperCase().replace(/\s/g, '');
+      let habitatNote = '';
+
+      if (hCode && m.habitats?.length) {
         const matches = m.habitats.some(h => hCode.includes(h.replace(/\s/g,'')) || h.replace(/\s/g,'').includes(hCode));
-        if (matches) habitatBonus = 0.15;
+        if (matches) {
+          habitatBonus = 0.25;
+          habitatNote = `🏷️ Siedlisko ${habitatCode} — optymalne`;
+        }
       }
 
-      return { ...m, _treeMatch: treeMatch, _habitatBonus: habitatBonus };
+      // Specyficzne wykluczenia/bonusy siedliskowe
+      if (hCode.includes('BS') || hCode.includes('BR')) {
+        // Bory suche
+        if (m.id === 'tricholoma_equestre' || m.id === 'boletus_pinophilus' || m.id === 'suillus_variegatus') {
+          habitatBonus += 0.35;
+        } else if (m.id === 'cantharellus_cibarius' || m.id === 'leccinum_scabrum') {
+          habitatBonus -= 0.30;
+        }
+      } else if (hCode.includes('OL') || hCode.includes('LL')) {
+        // Olsy / łęgi
+        if (m.id === 'pleurotus_ostreatus' || m.id === 'flammulina_velutipes' || m.id === 'paxillus_involutus') {
+          habitatBonus += 0.40;
+        } else if (m.trees && m.trees.includes('So')) {
+          habitatBonus -= 0.45;
+        }
+      }
+
+      return {
+        ...m,
+        _treeMatch: Math.max(0, treeMatch),
+        _ageFactor: ageFactor,
+        _habitatBonus: habitatBonus,
+        _matchedTreeName: matchedTreeName,
+        _ageNote: ageNote,
+        _habitatNote: habitatNote,
+      };
     })
-    .filter(m => m._treeMatch > 0 || (!m.trees?.length))
-    .sort((a, b) => {
-      const sa = a.prevalence * (a._treeMatch + a._habitatBonus);
-      const sb = b.prevalence * (b._treeMatch + b._habitatBonus);
-      return sb - sa;
-    });
+    .filter(Boolean)
+    .filter(m => (m._treeMatch + m._habitatBonus) > 0.05);
 }
 
 /**
  * Wersja uproszczona — lista kodów gatunków (kompatybilność wsteczna)
  */
-export function getMushroomsForMixedForest(speciesCodes = []) {
+export function getMushroomsForMixedForest(speciesCodes = [], habitatCode = null, forestAge = null) {
   const speciesWithPct = speciesCodes.map(c => ({ code: c, pct: Math.round(100 / Math.max(speciesCodes.length, 1)) }));
-  return getMushroomsForStand(speciesWithPct, null);
+  return getMushroomsForStand(speciesWithPct, habitatCode, forestAge);
 }
 
 /**

@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/style.css?v=4.2" />
+  <link rel="stylesheet" href="css/style.css?v=5.0" />
 </head>
 <body>
 
@@ -119,24 +119,28 @@
     <div class="ftl-note">Dane BDL LP · Przybliż mapę (&gt;zoom 11)</div>
   </div>
 
-  <!-- Legenda szlaków turystycznych LP (ukryta domyślnie) -->
-  <div id="trails-legend" class="trails-legend hidden" aria-label="Legenda szlaków turystycznych">
-    <div class="trails-legend-title">🥾 Szlaki i ścieżki LP</div>
+  <!-- Legenda szlaków turystycznych LP i ścieżek (ukryta domyślnie) -->
+  <div id="trails-legend" class="trails-legend hidden" aria-label="Legenda szlaków i ścieżek leśnych">
+    <div class="trails-legend-title">🥾 Szlaki i ścieżki leśne</div>
     <div class="trails-legend-items">
       <div class="trails-legend-item">
-        <span class="trails-dot trails-dot-hiking"></span>
-        <span>Szlaki turystyczne</span>
+        <span class="trails-dot trails-dot-oddzialy"></span>
+        <span>Linie i oddziały LP (dukty)</span>
       </div>
       <div class="trails-legend-item">
-        <span class="trails-dot trails-dot-horse"></span>
-        <span>Ścieżki konne</span>
+        <span class="trails-dot trails-dot-hiking"></span>
+        <span>Szlaki turystyczne PTTK</span>
       </div>
       <div class="trails-legend-item">
         <span class="trails-dot trails-dot-didactic"></span>
         <span>Ścieżki dydaktyczne</span>
       </div>
+      <div class="trails-legend-item">
+        <span class="trails-dot trails-dot-horse"></span>
+        <span>Ścieżki konne</span>
+      </div>
     </div>
-    <div class="trails-legend-note">Dane BDL LP · Mapa Turystyczna</div>
+    <div class="trails-legend-note">Dane: BDL Lasy Państwowe · Waymarked Trails</div>
   </div>
 
   <!-- Backdrop -->
@@ -235,7 +239,7 @@
 
 
 <!-- Główna aplikacja (ES modules) -->
-<script type="module" src="js/app.js?v=4.2"></script>
+<script type="module" src="js/app.js?v=5.0"></script>
 
 <!-- Service Worker Cache Purge & Register -->
 <script>

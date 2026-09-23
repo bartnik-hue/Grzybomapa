@@ -256,25 +256,42 @@ function addForestWMSLayer() {
   }
 }
 
+const WMS_BDL_ODDZIALY = 'https://mapserver.bdl.lasy.gov.pl/ArcGIS/services/WMS_BDL/MapServer/WMSServer';
+
 /**
- * Utwórz warstwę WMS szlaków turystycznych LP BDL
- * Prawdziwe ID wg ArcGIS REST API:
- *   18 = "Szlaki turystyczne" (Group Layer — zawiera podwarstwy)
- *   19 = "scieżka konna" (Polyline)
- *   20 = "Ścieżki dydaktyczne" (Polyline, skala do 1:150k)
- *   21 = "Ścieżki dydaktyczne" (Polyline, skala > 1:150k)
- * Skala minScale: 1500000 → widoczne przy zoom >= 9 (całe województwo)
+ * Utwórz kompletną warstwę leśnych ścieżek i tras:
+ *  1. Linie oddziałowe i podział powierzchniowy LP (BDL warstwa 3) — dukty, drogi leśne i numery oddziałów
+ *  2. Szlaki turystyczne i trasy piesze w lasach (Waymarked Trails) — znakowane szlaki PTTK (czerwone, niebieskie, itp.)
+ *  3. Ścieżki dydaktyczne i konne LP (BDL Mapa Turystyczna)
  */
 function createTrailsWMSLayer() {
-  return L.tileLayer.wms(WMS_BDL_URL, {
-    layers: '18,19,20,21',
+  const oddzialyLayer = L.tileLayer.wms(WMS_BDL_ODDZIALY, {
+    layers: '3',
     format: 'image/png',
     transparent: true,
-    opacity: 0.9,
-    attribution: '© Lasy Państwowe BDL — Mapa Turystyczna',
+    opacity: 0.85,
+    attribution: '© Lasy Państwowe BDL (Oddziały)',
     maxZoom: 19,
     version: '1.3.0',
   });
+
+  const hikingLayer = L.tileLayer('https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    opacity: 0.95,
+    attribution: '© Waymarked Trails (Szlaki PTTK)',
+  });
+
+  const turystykaLayer = L.tileLayer.wms(WMS_BDL_URL, {
+    layers: '19,20,21',
+    format: 'image/png',
+    transparent: true,
+    opacity: 0.85,
+    attribution: '© Lasy Państwowe BDL (Turystyka)',
+    maxZoom: 19,
+    version: '1.3.0',
+  });
+
+  return L.layerGroup([oddzialyLayer, hikingLayer, turystykaLayer]);
 }
 
 /**

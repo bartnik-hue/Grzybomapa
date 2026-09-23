@@ -17,12 +17,13 @@
 
 /**
  * Oblicz wynik (0..100) dla każdego grzyba
- * @param {Array}  mushrooms      — lista z mushroom_knowledge z _treeMatch
+ * @param {Array}  mushrooms       — lista z mushroom_knowledge z _treeMatch, _ageFactor, _habitatBonus
  * @param {Object} weatherAnalysis — wynik z weather.js analyzeWeather()
- * @param {number} month          — aktualny miesiąc 1..12
+ * @param {number} month           — aktualny miesiąc 1..12
+ * @param {Object} forestData      — obiekt danych leśnych
  * @returns {Array} posortowane [{...mushroom, score, components}]
  */
-export function scoreAllMushrooms(mushrooms, weatherAnalysis, month = new Date().getMonth() + 1) {
+export function scoreAllMushrooms(mushrooms, weatherAnalysis, month = new Date().getMonth() + 1, forestData = null) {
   return mushrooms
     .map(m => {
       // — Sezon
@@ -33,12 +34,17 @@ export function scoreAllMushrooms(mushrooms, weatherAnalysis, month = new Date()
         ? calcWeatherScore(m, weatherAnalysis)
         : 0.45; // Brak pogody: neutralna wartość
 
-      // — Dopasowanie drzew (wstrzyknięte przez mushroom_knowledge)
+      // — Dopasowanie drzew i wieku (wstrzyknięte przez mushroom_knowledge)
       const treeMatch = m._treeMatch ?? 1.0;
+      const ageFactor = m._ageFactor ?? 1.0;
       const habitatBonus = m._habitatBonus ?? 0;
 
-      // — Wynik końcowy
-      const raw = m.prevalence * (treeMatch + habitatBonus) * seasonScore * weatherScore;
+      // — Ekologiczna waga pospolitości (pospolite grzyby nie dławią już rzadszych specjalistów)
+      const prevFactor = 0.55 + 0.45 * (m.prevalence || 0.5);
+
+      // — Wynik końcowy gatunku
+      const standFactor = Math.max(0, (treeMatch + habitatBonus) * ageFactor);
+      const raw = standFactor * seasonScore * weatherScore * prevFactor;
       const score = Math.min(Math.round(raw * 100), 100);
 
       return {
@@ -47,9 +53,12 @@ export function scoreAllMushrooms(mushrooms, weatherAnalysis, month = new Date()
         seasonScore,
         weatherScore,
         treeMatch,
+        matchedTreeName: m._matchedTreeName || '',
+        ageNote: m._ageNote || '',
+        habitatNote: m._habitatNote || '',
         components: {
-          prevalence:   Math.round(m.prevalence * 100),
-          tree:         Math.round((treeMatch + habitatBonus) * 100),
+          prevalence:   Math.round((m.prevalence || 0.5) * 100),
+          tree:         Math.min(100, Math.round(standFactor * 100)),
           season:       Math.round(seasonScore * 100),
           weather:      Math.round(weatherScore * 100),
         },
@@ -57,6 +66,100 @@ export function scoreAllMushrooms(mushrooms, weatherAnalysis, month = new Date()
     })
     .filter(m => m.score > 0)
     .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Oblicz prognozowane szanse na grzybobranie na kolejne 7 dni na podstawie prognozy Open-Meteo
+ * @param {Object} weatherData — obiekt z getWeatherData ({ current, history14d, forecast7d, analysis })
+ * @param {Object} forestData  — obiekt z getForestData
+ * @returns {Object|null} { days: [...], bestDay, tacticalTip }
+ */
+export function calculateDailyForecastScores(weatherData, forestData) {
+  const daily = weatherData?.forecast7d;
+  if (!daily || !daily.time || !daily.time.length) return null;
+
+  const times = daily.time;
+  const rains = daily.precipitation_sum || [];
+  const tMaxs = daily.temperature_2m_max || [];
+  const tMins = daily.temperature_2m_min || [];
+  const probs = daily.precipitation_probability_max || [];
+  const codes = daily.weathercode || [];
+
+  const histRain14 = weatherData?.analysis?.totalRain14 ?? 18;
+  const days = [];
+  let cumRainFuture = 0;
+  let bestDayIndex = 0;
+  let maxScore = -1;
+
+  for (let i = 0; i < times.length; i++) {
+    const dateStr = times[i];
+    const rain = rains[i] ?? 0;
+    const tMax = tMaxs[i] ?? 18;
+    const tMin = tMins[i] ?? 10;
+    const prob = probs[i] ?? 0;
+    const code = codes[i] ?? 0;
+
+    cumRainFuture += rain;
+    // Symulacja sumy opadów z uwzględnieniem wysychania i nowych deszczów
+    const effRain14 = Math.max(0, histRain14 * Math.pow(0.93, i + 1) + cumRainFuture);
+    const avgTemp = (tMax + tMin) / 2;
+
+    const simWeather = {
+      avgNightTemp7: tMin,
+      avgTemp7: avgTemp,
+      totalRain14: effRain14,
+      avgHumidity7: rain > 4 ? 82 : (prob > 50 ? 75 : 62),
+    };
+
+    const dayScore = calculateOverallScore(simWeather, forestData);
+
+    let trend = 'steady';
+    if (i > 0) {
+      const prev = days[i - 1].score;
+      if (dayScore - prev >= 5) trend = 'up';
+      else if (prev - dayScore >= 5) trend = 'down';
+    }
+
+    if (dayScore > maxScore) {
+      maxScore = dayScore;
+      bestDayIndex = i;
+    }
+
+    const dateObj = new Date(dateStr);
+    const dayName = dateObj.toLocaleDateString('pl-PL', { weekday: 'short' });
+    const dayDate = dateObj.toLocaleDateString('pl-PL', { day: 'numeric', month: 'numeric' });
+
+    days.push({
+      date: dateStr,
+      dayName: dayName.toUpperCase(),
+      dayDate,
+      rain: Math.round(rain * 10) / 10,
+      prob: Math.round(prob),
+      tMax: Math.round(tMax),
+      tMin: Math.round(tMin),
+      code,
+      score: dayScore,
+      trend,
+    });
+  }
+
+  const bestDay = days[bestDayIndex];
+  let tacticalTip = '';
+  if (bestDay) {
+    if (bestDay.score >= 70) {
+      tacticalTip = `🎯 **Najlepszy dzień na grzybobranie:** ${bestDay.dayName} ${bestDay.dayDate} (${bestDay.score}% szans). Znakomity bilans wilgoci i temperatury.`;
+    } else if (bestDay.score >= 45) {
+      tacticalTip = `🌦️ **Optymalne okno:** ${bestDay.dayName} ${bestDay.dayDate} (${bestDay.score}% szans). Umiarkowany wysyp — szukaj w wilgotnych zagłębieniach, zagajnikach i mchu.`;
+    } else {
+      tacticalTip = `🍂 **Suchy okres w prognozie:** Najkorzystniej wypada ${bestDay.dayName} (${bestDay.score}%). Brak większych opadów ogranicza wysypy.`;
+    }
+  }
+
+  return {
+    days,
+    bestDay,
+    tacticalTip,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -8,9 +8,9 @@ import { startTracking, getCurrentPosition, stopTracking } from './location.js';
 import { getForestData, getForestBoundary } from './forest_api.js';
 import { getWeatherData, weatherCodeToText, weatherCodeToIcon } from './weather.js';
 import { getMushroomsForStand, getMushroomsForMixedForest, filterBySeason, TREE_SPECIES } from './mushroom_knowledge.js';
-import { scoreAllMushrooms, calculateOverallScore, generateSummary, generateDetailedDiagnosis, edibleLabel, scoreToColor, scoreToLabel } from './scoring.js';
+import { scoreAllMushrooms, calculateOverallScore, calculateDailyForecastScores, generateSummary, generateDetailedDiagnosis, edibleLabel, scoreToColor, scoreToLabel } from './scoring.js';
 import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleDeciduousLayer, toggleConiferousLayer, toggleTrailsLayer, isTrailsVisible } from './map.js';
-import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=4.2';
+import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=5.0';
 
 // ── Stan aplikacji ─────────────────────────────────────────────────
 const state = {
@@ -19,6 +19,7 @@ const state = {
   accuracy: null,
   forestData: null,
   weatherData: null,
+  forecastAnalysis: null,
   mushroomList: [],
   overallScore: 0,
   summary: null,
@@ -264,17 +265,14 @@ async function loadAllData(lat, lng) {
     }
 
     const weatherAnalysis = state.weatherData?.analysis || null;
-    let mushrooms;
-    if (speciesWithPct.length > 0) {
-      mushrooms = getMushroomsForStand(speciesWithPct, f?.habitatCode);
-      mushrooms = filterBySeason(mushrooms, month);
-    } else {
-      // Brak danych o drzewostanie — pokaż gatunki powszechne
-      mushrooms = filterBySeason(getMushroomsForStand([], null), month);
-    }
+    const forestAge = f?.specAge ? parseInt(f.specAge, 10) : null;
 
-    state.mushroomList = scoreAllMushrooms(mushrooms, weatherAnalysis, month);
+    let mushrooms = getMushroomsForStand(speciesWithPct, f?.habitatCode, forestAge);
+    mushrooms = filterBySeason(mushrooms, month);
+
+    state.mushroomList = scoreAllMushrooms(mushrooms, weatherAnalysis, month, state.forestData);
     state.overallScore = calculateOverallScore(weatherAnalysis, state.forestData);
+    state.forecastAnalysis = calculateDailyForecastScores(state.weatherData, state.forestData);
     state.summary = generateSummary(
       state.overallScore,
       weatherAnalysis,
@@ -483,6 +481,58 @@ function renderWeather() {
 
   const cur = w.current;
   const a = w.analysis;
+  const fa = state.forecastAnalysis;
+
+  let forecastHtml = '';
+  if (fa?.days?.length) {
+    const daysCards = fa.days.map(d => {
+      const color = scoreToColor(d.score);
+      const icon = weatherCodeToIcon(d.code);
+      const rainLabel = d.rain > 0 ? `💧 ${d.rain} mm` : (d.prob > 20 ? `💧 ${d.prob}%` : '—');
+      const trendBadge = d.trend === 'up'
+        ? '<span class="f-trend up" title="Wzrost szans">📈 +</span>'
+        : (d.trend === 'down' ? '<span class="f-trend down" title="Spadek">📉 -</span>' : '');
+
+      return `
+        <div class="f-day-card ${d.score >= 70 ? 'f-day-peak' : ''}">
+          <div class="f-day-name">${d.dayName}</div>
+          <div class="f-day-date">${d.dayDate}</div>
+          <div class="f-day-icon">${icon}</div>
+          <div class="f-day-temps">
+            <span class="f-tmax">${d.tMax}°</span>
+            <span class="f-tmin">${d.tMin}°</span>
+          </div>
+          <div class="f-day-rain">${rainLabel}</div>
+          <div class="f-score-wrap">
+            <span class="f-score-val" style="color:${color}">🍄 ${d.score}%</span>
+            ${trendBadge}
+          </div>
+          <div class="f-mini-bar">
+            <div class="f-mini-fill" style="width:${Math.max(d.score, 4)}%;background:${color}"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    forecastHtml = `
+      <div class="weather-forecast-block">
+        <div class="forecast-header">
+          <div>
+            <div class="forecast-title">📅 Prognoza 7-dniowa & Szanse na grzyby</div>
+            <div class="forecast-sub">Model wzrostu grzybni: opad × bilans wilgoci × temperatura</div>
+          </div>
+        </div>
+        <div class="forecast-scroll-row">
+          ${daysCards}
+        </div>
+        ${fa.tacticalTip ? `
+          <div class="forecast-tactical-tip">
+            ${fa.tacticalTip}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
 
   el.innerHTML = `
     <div class="weather-grid">
@@ -514,6 +564,7 @@ function renderWeather() {
         </div>
       ` : ''}
     </div>
+    ${forecastHtml}
   `;
 }
 
@@ -566,23 +617,31 @@ function renderMushrooms() {
   if (!all || all.length === 0) {
     el.innerHTML = `
       <div class="empty-list">
-        <p>Brak danych o grzybach.<br>
-        <small>Wejdź do lasu państwowego, aby zobaczyć listę gatunków.</small></p>
+        <p>Brak danych o grzybach dla tego terenu.<br>
+        <small>Wybierz inny punkt w lesie państwowym, aby zobaczyć dopasowane gatunki.</small></p>
       </div>`;
     return;
   }
 
   // Podziel na grupy
-  const edible   = all.filter(m => m.edible === 'jadalne' && m.score > 5);
-  const caution  = all.filter(m => (m.edible === 'uwaga' || m.edible === 'niejadalne') && m.score > 5);
-  const toxic    = all.filter(m => m.edible === 'trujące' && m.score > 3);
+  const edible   = all.filter(m => m.edible === 'jadalne' && m.score > 4);
+  const caution  = all.filter(m => (m.edible === 'uwaga' || m.edible === 'niejadalne') && m.score > 4);
+  const toxic    = all.filter(m => m.edible === 'trujące' && m.score > 2);
 
-  const renderGroup = (list, limit = 12) => list.slice(0, limit).map(m => {
+  const renderGroup = (list, limit = 20) => list.slice(0, limit).map(m => {
     const edibleInfo = edibleLabel(m.edible);
     const barColor   = scoreToColor(m.score);
     const id         = `d-${m.id}`;
     const pct = m.score;
     const cmp = m.components || {};
+
+    const treeBadge = m.matchedTreeName
+      ? `<span class="tag tag-tree" title="Główny partner mikoryzowy">🌳 ${m.matchedTreeName}</span>`
+      : `<span class="tag tag-relation">${m.relation}</span>`;
+
+    const ageBadge = m.ageNote
+      ? `<span class="tag tag-age">${m.ageNote.split('—')[0]}</span>`
+      : '';
 
     return `
       <div class="mushroom-card ${m.danger ? 'danger' : ''}" onclick="toggleMushroomDetail('${id}')">
@@ -593,7 +652,8 @@ function renderMushrooms() {
             <div class="mushroom-latin">${m.latin}</div>
             <div class="mushroom-tags">
               <span class="tag ${edibleInfo.cls}">${edibleInfo.text}</span>
-              <span class="tag tag-relation">${m.relation}</span>
+              ${treeBadge}
+              ${ageBadge}
             </div>
           </div>
           <div class="mushroom-score-col">
@@ -607,16 +667,38 @@ function renderMushrooms() {
         <div class="mushroom-detail hidden" id="${id}">
           <p class="mushroom-desc">${m.description || ''}</p>
           ${m.danger ? '<p class="danger-warning">⚠️ Ten gatunek jest śmiertelnie niebezpieczny!</p>' : ''}
+
+          <!-- Ekologiczne wyznaczniki w tym punkcie -->
+          <div class="eco-indicators-box">
+            <div class="eco-ind-title">🔍 Dlaczego ten grzyb w tym wydzieleniu?</div>
+            <div class="eco-ind-list">
+              <div class="eco-ind-item">
+                <span class="eco-ind-icon">🌳</span>
+                <span>Drzewa gospodarcze: <strong>${m.matchedTreeName || 'Lasy mieszane i liściaste'}</strong></span>
+              </div>
+              ${m.ageNote ? `
+              <div class="eco-ind-item">
+                <span class="eco-ind-icon">🌱</span>
+                <span>Wiek drzewostanu: <strong>${m.ageNote}</strong></span>
+              </div>` : ''}
+              ${m.habitatNote ? `
+              <div class="eco-ind-item">
+                <span class="eco-ind-icon">🏷️</span>
+                <span>Siedlisko: <strong>${m.habitatNote}</strong></span>
+              </div>` : ''}
+            </div>
+          </div>
+
           <div class="score-components">
-            <div class="sc-item" title="Dopasowanie do drzewostanu">
+            <div class="sc-item" title="Dopasowanie do drzewostanu i siedliska">
               <span class="sc-label">🌳 Drzewostan</span>
               <span class="sc-val" style="color:${barColor}">${cmp.tree ?? '—'}%</span>
             </div>
-            <div class="sc-item" title="Sezon">
+            <div class="sc-item" title="Sezonowość">
               <span class="sc-label">📅 Sezon</span>
               <span class="sc-val">${cmp.season ?? '—'}%</span>
             </div>
-            <div class="sc-item" title="Warunki pogodowe: temp + opady + wilgotność">
+            <div class="sc-item" title="Warunki pogodowe">
               <span class="sc-label">🌦️ Pogoda</span>
               <span class="sc-val">${cmp.weather ?? '—'}%</span>
             </div>
@@ -648,8 +730,8 @@ function renderMushrooms() {
   }).join('');
 
   let html = '';
-  if (edible.length)  html += `<div class="mushroom-group-label">🍄 Jadalne (${edible.length})</div>${renderGroup(edible, 12)}`;
-  if (caution.length) html += `<div class="mushroom-group-label warn">⚠️ Uwaga / niejadalne (${caution.length})</div>${renderGroup(caution, 6)}`;
+  if (edible.length)  html += `<div class="mushroom-group-label">🍄 Jadalne (${edible.length})</div>${renderGroup(edible, 22)}`;
+  if (caution.length) html += `<div class="mushroom-group-label warn">⚠️ Uwaga / niejadalne (${caution.length})</div>${renderGroup(caution, 8)}`;
   if (toxic.length)   html += `<div class="mushroom-group-label danger">☠️ Trujące — ostrzeżenie (${toxic.length})</div>${renderGroup(toxic, 8)}`;
 
   el.innerHTML = html;
