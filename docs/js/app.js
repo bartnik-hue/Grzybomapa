@@ -239,35 +239,46 @@ async function loadAllData(lat, lng) {
     state.forestData = forestData.status === 'fulfilled' ? forestData.value : null;
     state.weatherData = weatherData.status === 'fulfilled' ? weatherData.value : null;
 
-    if (!state.forestData) {
-      // Nie jesteśmy w lesie państwowym
-      setStatus('Brak danych leśnych — możliwe, że nie jesteś w lesie.', 'warn');
+    if (!state.forestData || state.forestData.isForest === false) {
+      if (state.forestData?.terrainType === 'urban') {
+        setStatus('Teren zabudowany / miasto — brak lasu i grzybów.', 'warn');
+      } else if (state.forestData?.terrainType === 'water') {
+        setStatus('Zbiornik / ciek wodny — brak lasu.', 'warn');
+      } else {
+        setStatus('Teren otwarty / łąka — brak lasu (wykluczono grzyby leśne).', 'warn');
+      }
     }
 
-    // Rysuj granicę wydzielenia — jeśli OGC zwróciło geometrię w _feature, użyj jej
-    if (state.forestData?._feature) {
+    // Rysuj granicę wydzielenia — tylko jeśli rzeczywiście jesteśmy w lesie
+    if (state.forestData?.isForest && state.forestData._feature) {
       showForestBoundary(state.forestData._feature);
-    } else if (state.forestData) {
+    } else if (state.forestData?.isForest) {
       getForestBoundary(lat, lng).then(b => showForestBoundary(b));
+    } else {
+      showForestBoundary(null);
     }
 
     // Oblicz grzyby i scoring
     const month = new Date().getMonth() + 1;
     const f = state.forestData;
+    const isForest = f ? f.isForest !== false : false;
+    const terrainType = f?.terrainType || (isForest ? 'forest' : 'meadow');
 
-    // Skład z procentami — jeśli mamy rawCode to parsujemy, inaczej równe udziały
+    // Skład z procentami — jeśli mamy rawCode to parsujemy, inaczej równe udziały (tylko w lesie)
     let speciesWithPct = [];
-    if (f?.rawCode) {
-      speciesWithPct = parseCompositionForScoring(f.rawCode, f.speciesCodes);
-    } else if (f?.speciesCodes?.length) {
-      const eqPct = Math.round(100 / f.speciesCodes.length);
-      speciesWithPct = f.speciesCodes.map(c => ({ code: c, pct: eqPct }));
+    if (isForest) {
+      if (f?.rawCode) {
+        speciesWithPct = parseCompositionForScoring(f.rawCode, f.speciesCodes);
+      } else if (f?.speciesCodes?.length) {
+        const eqPct = Math.round(100 / f.speciesCodes.length);
+        speciesWithPct = f.speciesCodes.map(c => ({ code: c, pct: eqPct }));
+      }
     }
 
     const weatherAnalysis = state.weatherData?.analysis || null;
     const forestAge = f?.specAge ? parseInt(f.specAge, 10) : null;
 
-    let mushrooms = getMushroomsForStand(speciesWithPct, f?.habitatCode, forestAge);
+    let mushrooms = getMushroomsForStand(speciesWithPct, f?.habitatCode, forestAge, isForest, terrainType);
     mushrooms = filterBySeason(mushrooms, month);
 
     state.mushroomList = scoreAllMushrooms(mushrooms, weatherAnalysis, month, state.forestData);
@@ -276,7 +287,8 @@ async function loadAllData(lat, lng) {
     state.summary = generateSummary(
       state.overallScore,
       weatherAnalysis,
-      f?.forestName
+      f?.forestName,
+      state.forestData
     );
     state.diagnosis = generateDetailedDiagnosis(
       state.overallScore,
@@ -362,6 +374,44 @@ function renderForestInfo() {
   const modeBadge = state.pinMode
     ? '<span class="badge badge-pin">📌 Próbka ręczna</span>'
     : '<span class="badge badge-gps">📡 GPS na żywo</span>';
+
+  // Obsługa terenu niezalesionego (łąka / miasto / woda)
+  if (f.isForest === false) {
+    let terrainIcon = '🌾';
+    let terrainName = 'Teren otwarty / Łąka';
+    let terrainBadgeCls = 'badge-meadow';
+    let terrainDesc = 'Brak drzew leśnych wyklucza grzyby mikoryzowe (borowiki, podgrzybki, maślaki, kurki, rydze). W tym miejscu rosnąć mogą wyłącznie wybrane saprotrofy łąkowe (np. pieczarki, czasznice, twardzioszki).';
+
+    if (f.terrainType === 'urban') {
+      terrainIcon = '🏙️';
+      terrainName = 'Teren zurbanizowany / Zabudowa';
+      terrainBadgeCls = 'badge-urban';
+      terrainDesc = 'Gęsta zabudowa, drogi lub infrastruktura miejska. Brak naturalnego podłoża i warunków do występowania grzybów jadalnych.';
+    } else if (f.terrainType === 'water') {
+      terrainIcon = '💧';
+      terrainName = 'Zbiornik / Ciek wodny';
+      terrainBadgeCls = 'badge-water';
+      terrainDesc = 'Akwen lub teren stale podmokły — brak warunków do wzrostu grzybów naziemnych.';
+    }
+
+    infoEl.innerHTML = `
+      <div class="forest-header">
+        <span class="forest-icon-big">${terrainIcon}</span>
+        <div>
+          <h2 class="forest-name">${f.forestName || terrainName}</h2>
+          <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
+            ${modeBadge}
+            <span class="badge badge-nonforest">Teren niezalesiony</span>
+            <span class="badge ${terrainBadgeCls}">${terrainName}</span>
+          </div>
+        </div>
+      </div>
+      <div class="nonforest-box">
+        <strong>Status terenu:</strong> ${terrainDesc}
+      </div>
+    `;
+    return;
+  }
 
   const sourceBadge = (f.source === 'OGC_LP' || f.source === 'LP_WFS')
     ? '<span class="badge badge-lp">Lasy Państwowe</span>'
@@ -613,12 +663,24 @@ function renderOverallScore() {
 function renderMushrooms() {
   const el = $('mushroom-list');
   const all = state.mushroomList;
+  const f = state.forestData;
+  const isNonForest = f && f.isForest === false;
+
+  if (isNonForest && (f.terrainType === 'urban' || f.terrainType === 'water')) {
+    el.innerHTML = `
+      <div class="empty-list">
+        <span style="font-size:32px;display:block;margin-bottom:8px">${f.terrainType === 'urban' ? '🏙️' : '💧'}</span>
+        <p>Brak grzybów na terenie ${f.terrainType === 'urban' ? 'zurbanizowanym / miejskim' : 'wodnym'}.<br>
+        <small>Wybierz las lub łąkę, aby sprawdzić występowanie grzybów.</small></p>
+      </div>`;
+    return;
+  }
 
   if (!all || all.length === 0) {
     el.innerHTML = `
       <div class="empty-list">
-        <p>Brak danych o grzybach dla tego terenu.<br>
-        <small>Wybierz inny punkt w lesie państwowym, aby zobaczyć dopasowane gatunki.</small></p>
+        <p>Brak grzybów dla tego terenu w obecnym sezonie.<br>
+        <small>Wybierz inny punkt w lesie lub na łące, aby zobaczyć dopasowane gatunki.</small></p>
       </div>`;
     return;
   }
@@ -637,11 +699,15 @@ function renderMushrooms() {
 
     const treeBadge = m.matchedTreeName
       ? `<span class="tag tag-tree" title="Główny partner mikoryzowy">🌳 ${m.matchedTreeName}</span>`
-      : `<span class="tag tag-relation">${m.relation}</span>`;
+      : `<span class="tag tag-relation">${m.relation || (isNonForest ? 'Saprotrof łąkowy' : 'Saprotrof')}</span>`;
 
     const ageBadge = m.ageNote
       ? `<span class="tag tag-age">${m.ageNote.split('—')[0]}</span>`
       : '';
+
+    const treeEcoText = m.matchedTreeName
+      ? m.matchedTreeName
+      : (isNonForest ? 'Brak powiązania z drzewami (gatunek łąkowy / saprotroficzny)' : 'Lasy mieszane i liściaste');
 
     return `
       <div class="mushroom-card ${m.danger ? 'danger' : ''}" onclick="toggleMushroomDetail('${id}')">
@@ -674,7 +740,7 @@ function renderMushrooms() {
             <div class="eco-ind-list">
               <div class="eco-ind-item">
                 <span class="eco-ind-icon">🌳</span>
-                <span>Drzewa gospodarcze: <strong>${m.matchedTreeName || 'Lasy mieszane i liściaste'}</strong></span>
+                <span>Drzewa / Podłoże: <strong>${treeEcoText}</strong></span>
               </div>
               ${m.ageNote ? `
               <div class="eco-ind-item">
@@ -739,6 +805,17 @@ function renderMushrooms() {
   }).join('');
 
   let html = '';
+  if (isNonForest && (!f.terrainType || f.terrainType === 'meadow')) {
+    html += `
+      <div class="meadow-banner">
+        <span class="meadow-banner-icon">🌾</span>
+        <div class="meadow-banner-text">
+          <strong>Teren otwarty / łąka (brak lasu)</strong>
+          <span>Wykluczono wszystkie grzyby mikoryzowe (borowiki, kurki, maślaki, podgrzybki). Poniżej prezentowane są wyłącznie gatunki łąkowe, trawiaste i saprotrofy przydrożne.</span>
+        </div>
+      </div>
+    `;
+  }
   if (edible.length)  html += `<div class="mushroom-group-label">🍄 Jadalne (${edible.length})</div>${renderGroup(edible, 40)}`;
   if (caution.length) html += `<div class="mushroom-group-label warn">⚠️ Uwaga / niejadalne (${caution.length})</div>${renderGroup(caution, 15)}`;
   if (toxic.length)   html += `<div class="mushroom-group-label danger">☠️ Trujące — ostrzeżenie (${toxic.length})</div>${renderGroup(toxic, 15)}`;

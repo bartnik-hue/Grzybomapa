@@ -1267,9 +1267,9 @@ export const MUSHROOM_DATABASE = [
     latin: 'Agaricus arvensis',
     grzybyUrl: 'https://www.grzyby.pl/gatunki/Agaricus_arvensis.htm',
     edible: 'jadalne', danger: false, icon: '🍄', relation: 'saprotroficzny',
-    description: 'Duża pieczarka o białym, z wiekiem kremowożółknącym kapeluszu. Pierścień od spodu przypomina koło zębate. Wydziela wspaniały, aromatyczny zapach anyżku lub migdałów. Rośnie na skrajach lasów i polanach.',
-    trees: ['Sw', 'Bk', 'So'], treeStrict: false,
-    agePref: 'mature',
+    description: 'Duża pieczarka o białym, z wiekiem kremowożółknącym kapeluszu. Pierścień od spodu przypomina koło zębate. Wydziela wspaniały, aromatyczny zapach anyżku lub migdałów. Rośnie na pastwiskach, łąkach i polanach.',
+    trees: [], treeStrict: false,
+    agePref: 'any',
     habitats: ['BMŚ', 'LMŚ', 'LŚW'],
     months: [6, 7, 8, 9, 10], peakMonths: [7, 8, 9],
     ecology: { tempMin: 10, tempMax: 24, tempDayMax: 28,
@@ -1315,8 +1315,8 @@ export const MUSHROOM_DATABASE = [
     latin: 'Agaricus xanthodermus',
     grzybyUrl: 'https://www.grzyby.pl/gatunki/Agaricus_xanthodermus.htm',
     edible: 'trujące', danger: true, icon: '☠️', relation: 'saprotroficzny',
-    description: 'TRUJĄCA! Powoduje silne torsje i wymioty. Kluczowe cechy rozpoznawcze: po zadrapaniu podstawy trzonu natychmiast zabarwia się na jaskrawy, chromowożółty kolor, a przy podgrzaniu wydziela odrażający zapach karbolu / atramentu / chemikaliów.',
-    trees: ['Db', 'Bk', 'Sw'], treeStrict: false,
+    description: 'TRUJĄCA! Powoduje silne torsje i wymioty. Kluczowe cechy rozpoznawcze: po zadrapaniu podstawy trzonu natychmiast zabarwia się na jaskrawy chromowożółty kolor, a przy podgrzaniu wydziela odrażający zapach karbolu / atramentu / chemikaliów. Rośnie na trawnikach, łąkach, pastwiskach i w parkach.',
+    trees: [], treeStrict: false,
     agePref: 'any',
     habitats: ['LŚW', 'LMŚ', 'BMŚ'],
     months: [6, 7, 8, 9, 10], peakMonths: [7, 8, 9],
@@ -2282,7 +2282,27 @@ export function inferSpeciesFromHabitat(habitatCode) {
  * @param {number|string} forestAge — wiek drzewostanu w latach (np. 15, 80)
  * @returns {Array} lista grzybów z wagami ekologicznymi
  */
-export function getMushroomsForStand(speciesWithPct = [], habitatCode = null, forestAge = null) {
+export function getMushroomsForStand(speciesWithPct = [], habitatCode = null, forestAge = null, isForest = true, terrainType = 'forest') {
+  // 1. Jeśli teren NIE jest leśny (łąka, pole, miasto, woda):
+  if (!isForest) {
+    if (terrainType === 'urban' || terrainType === 'water') {
+      return []; // W terenie zurbanizowanym i na wodzie brak jakichkolwiek grzybów
+    }
+    // Na łąkach i polach dopuszczamy WYŁĄCZNIE saprotrofy łąkowe / bezdrzewne
+    return MUSHROOM_DATABASE
+      .filter(m => !m.trees || m.trees.length === 0)
+      .map(m => ({
+        ...m,
+        _treeMatch: 1.0,
+        _ageFactor: 1.0,
+        _habitatBonus: 0.20,
+        _matchedTreeName: 'Łąki, pastwiska i trawniki',
+        _ageNote: '',
+        _habitatNote: '🌾 Otwarte siedlisko łąkowe / trawiaste',
+        _isMeadowOnly: true,
+      }));
+  }
+
   let specs = speciesWithPct;
   if (!specs || specs.length === 0) {
     specs = inferSpeciesFromHabitat(habitatCode);

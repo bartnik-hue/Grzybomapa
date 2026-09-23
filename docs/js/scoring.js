@@ -24,6 +24,12 @@
  * @returns {Array} posortowane [{...mushroom, score, components}]
  */
 export function scoreAllMushrooms(mushrooms, weatherAnalysis, month = new Date().getMonth() + 1, forestData = null) {
+  if (forestData && forestData.isForest === false) {
+    if (forestData.terrainType === 'urban' || forestData.terrainType === 'water') {
+      return []; // Teren miejski lub wodny — brak jakichkolwiek grzybów
+    }
+  }
+
   return mushrooms
     .map(m => {
       // — Sezon
@@ -145,7 +151,14 @@ export function calculateDailyForecastScores(weatherData, forestData) {
 
   const bestDay = days[bestDayIndex];
   let tacticalTip = '';
-  if (bestDay) {
+
+  if (forestData && forestData.isForest === false) {
+    if (forestData.terrainType === 'urban' || forestData.terrainType === 'water') {
+      tacticalTip = `🏙️ **Obszar zurbanizowany / woda:** Brak warunków do owocowania grzybów. Wybierz las na mapie.`;
+    } else {
+      tacticalTip = `🌾 **Teren łąkowy / otwarty:** Grzyby leśne tu nie występują. Po deszczu wypatruj pieczarek polnych i twardzioszka przydrożnego na pastwiskach i łąkach.`;
+    }
+  } else if (bestDay) {
     if (bestDay.score >= 70) {
       tacticalTip = `🎯 **Najlepszy dzień na grzybobranie:** ${bestDay.dayName} ${bestDay.dayDate} (${bestDay.score}% szans). Znakomity bilans wilgoci i temperatury.`;
     } else if (bestDay.score >= 45) {
@@ -286,7 +299,7 @@ function calcHumidScore(eco, wa) {
  * Oblicz ocenę ekologiczną drzewostanu na podstawie wieku, gatunku i siedliska (BDL)
  */
 export function scoreStand(props) {
-  if (!props) return null;
+  if (!props || props.isForest === false) return null;
   const age = parseInt(props.spec_age || props.specAge || 0, 10);
   const spec = (props.species_cd || props.speciesCodes?.[0] || props.rawCode || '').toUpperCase().trim();
   const site = (props.site_type || props.habitatCode || '').toUpperCase().trim();
@@ -396,6 +409,26 @@ export function scoreStand(props) {
  */
 export function calculateOverallScore(weatherAnalysis, forestData) {
   if (!weatherAnalysis && !forestData) return 0;
+
+  // 1. Jeśli to teren NIEZALESIONY:
+  if (forestData && forestData.isForest === false) {
+    if (forestData.terrainType === 'urban' || forestData.terrainType === 'water') {
+      return 0; // W terenie miejskim lub na wodzie brak grzybów
+    }
+    // Teren łąkowy / otwarty: grzyby leśne tu nie rosną!
+    // Szanse na zbiory leśne = 0, a szanse na grzyby łąkowe (pieczarki, twardzioszki) to max 25% przy bdb pogodzie
+    const wa = weatherAnalysis;
+    let weatherFactor = 0.40;
+    if (wa) {
+      const rain14 = wa.totalRain14 ?? wa.totalPrecip14 ?? 0;
+      const rainFactor = clamp(rain14 / 35, 0, 1);
+      const tempNight = wa.avgNightTemp7 ?? wa.avgTemp7 ?? 12;
+      const tempFactor = (tempNight >= 6 && tempNight <= 22) ? 1.0 : 0.3;
+      weatherFactor = 0.60 * rainFactor + 0.40 * tempFactor;
+    }
+    return Math.round(clamp(weatherFactor * 25, 4, 25));
+  }
+
   const wa = weatherAnalysis;
 
   // Pogoda
@@ -434,7 +467,7 @@ export function generateDetailedDiagnosis(overallScore, weatherAnalysis, forestD
   const stand = scoreStand(forestData);
   const wa = weatherAnalysis;
 
-  // 1. Drzewostan
+  // 1. Drzewostan / Pokrycie terenu
   if (stand) {
     factors.push({
       type: stand.age <= 4 ? 'bad' : 'good',
@@ -452,6 +485,19 @@ export function generateDetailedDiagnosis(overallScore, weatherAnalysis, forestD
       val: stand.site || 'Bór świeży',
       desc: stand.siteDesc,
       impact: stand.siteImpact,
+    });
+  } else if (forestData && forestData.isForest === false) {
+    const isUrban = forestData.terrainType === 'urban';
+    const isWater = forestData.terrainType === 'water';
+    factors.push({
+      type: 'bad',
+      icon: isUrban ? '🏙️' : (isWater ? '🌊' : '🌾'),
+      title: 'Pokrycie terenu',
+      val: forestData.forestName || 'Teren niezalesiony',
+      desc: isUrban
+        ? 'Obszar zurbanizowany / drogi — brak warunków do owocowania grzybów.'
+        : (isWater ? 'Akwen wodny — grzyby nie występują w wodzie.' : 'Brak drzewostanu wyklucza mikoryzę leśną (brak borowików, kurek, rydzów). Możliwe wyłącznie nieliczne grzyby łąkowe.'),
+      impact: isUrban || isWater ? '-100%' : '-75%',
     });
   } else {
     factors.push({
@@ -501,7 +547,27 @@ export function generateDetailedDiagnosis(overallScore, weatherAnalysis, forestD
 /**
  * Generuj tekstowe podsumowanie sezonu
  */
-export function generateSummary(overallScore, weatherAnalysis, forestName) {
+export function generateSummary(overallScore, weatherAnalysis, forestName, forestData = null) {
+  // Specjalne podsumowanie dla terenu niezalesionego
+  if (forestData && forestData.isForest === false) {
+    if (forestData.terrainType === 'urban') {
+      return {
+        main: 'Wskazano obszar zurbanizowany (zabudowa, drogi lub infrastruktura miejska).',
+        tip: 'Grzyby nie występują w terenie miejskim. Aby sprawdzić szanse na zbiory, wskaż na mapie pobliski las.'
+      };
+    }
+    if (forestData.terrainType === 'water') {
+      return {
+        main: 'Wskazano akwen lub zbiornik wodny.',
+        tip: 'Grzyby występują wyłącznie na lądzie w środowisku leśnym lub łąkowym.'
+      };
+    }
+    return {
+      main: 'Wskazano teren niezalesiony (łąki, pastwiska lub pola uprawne). Grzyby leśne tu nie występują.',
+      tip: 'Borowiki, podgrzybki, kurki i maślaki rosną wyłącznie w symbiozie z korzeniami drzew leśnych. Na łąkach i pastwiskach można spotkać jedynie pieczarki polne, twardzioszka przydrożnego czy czasznicę olbrzymią. Aby znaleźć grzyby leśne, przejdź do lasu.'
+    };
+  }
+
   const wa = weatherAnalysis;
   const name = forestName ? ` w ${forestName}` : '';
 

@@ -58,7 +58,22 @@ export async function getForestData(lat, lng) {
     console.warn('[ForestAPI] Overpass error:', e.message);
   }
 
-  return null;
+  // 3. Poza lasem państwowym i brak obiektu leśnego w OSM: teren niezalesiony (łąka / pole)
+  return {
+    source: 'NON_FOREST',
+    isForest: false,
+    terrainType: 'meadow',
+    forestName: 'Teren niezalesiony (łąka / pole)',
+    nadlesnictwo: null,
+    rdlp: null,
+    speciesCodes: [],
+    habitatCode: null,
+    area: null,
+    rawCode: null,
+    specAge: null,
+    adrFor: null,
+    _feature: null,
+  };
 }
 
 /**
@@ -81,7 +96,7 @@ export async function getForestBoundary(lat, lng) {
 
     // Znajdź wydzielenie zawierające punkt
     const hit = findContainingFeature(data.features, lat, lng);
-    return hit || data.features[0];
+    return hit || null;
   } catch {
     return null;
   }
@@ -126,8 +141,12 @@ async function fetchFromOGC(lat, lng) {
   if (!data.features?.length) return null;
 
   // Wybierz wydzielenie zawierające punkt GPS (point-in-polygon)
-  const feature = findContainingFeature(data.features, lat, lng) || data.features[0];
-  const props = feature.properties;
+  const feature = findContainingFeature(data.features, lat, lng);
+  if (!feature) {
+    // Punkt leży poza granicami jakiegokolwiek wydzielenia leśnego LP
+    return null;
+  }
+  const props = feature.properties || {};
 
   const speciesCode = props.species_cd || null;
   const habitatCode = props.site_type  || null;
@@ -135,15 +154,57 @@ async function fetchFromOGC(lat, lng) {
   const area        = props.sub_area   || null;
   const specAge     = props.spec_age   || null;
   const adrFor      = props.adr_for    || null;
+  const areaType    = (props.area_type || '').toUpperCase();
+
+  const rdlpName     = collection.id.replace('RDLP_', '').replace('_wydzielenia', '');
+  const nadlesnictwo = extractNadlesnictwo(nazwaRaw, rdlpName);
+
+  // Weryfikacja typu powierzchni LP — czy to faktyczny drzewostan / las czy np. łąka, woda, bagno
+  if (areaType.includes('WODA') || areaType.includes('RZEKA')) {
+    return {
+      source: 'OGC_LP',
+      isForest: false,
+      terrainType: 'water',
+      forestName: 'Zbiornik wodny / rzeka (LP)',
+      nadlesnictwo,
+      rdlp: rdlpName,
+      speciesCodes: [],
+      habitatCode: null,
+      area: area ? `${Number(area).toFixed(1)} ha` : null,
+      rawCode: null,
+      specAge: null,
+      adrFor,
+      _feature: feature,
+    };
+  }
+
+  if (['ŁĄKA', 'LAKA', 'ROLNE', 'PASTW'].some(t => areaType.includes(t))) {
+    return {
+      source: 'OGC_LP',
+      isForest: false,
+      terrainType: 'meadow',
+      forestName: 'Łąka leśna / Teren otwarty (LP)',
+      nadlesnictwo,
+      rdlp: rdlpName,
+      speciesCodes: [],
+      habitatCode: habitatCode,
+      area: area ? `${Number(area).toFixed(1)} ha` : null,
+      rawCode: null,
+      specAge: null,
+      adrFor,
+      _feature: feature,
+    };
+  }
 
   const speciesCodes = parseSpeciesCode(speciesCode);
   const forestName   = parseNazwaLP(nazwaRaw, collection.id);
-  const rdlpName     = collection.id.replace('RDLP_', '').replace('_wydzielenia', '');
 
   return {
     source: 'OGC_LP',
+    isForest: true,
+    terrainType: 'forest',
     forestName,
-    nadlesnictwo: extractNadlesnictwo(nazwaRaw, rdlpName),
+    nadlesnictwo,
     rdlp: rdlpName,
     speciesCodes,
     habitatCode,
@@ -262,16 +323,19 @@ function formatRDLPName(collectionId) {
     .replace(/_/g, ' ');
 }
 
-// ── Overpass API (fallback dla lasów niepaństwowych) ───────────────
+// ── Overpass API (fallback dla lasów niepaństwowych i klasyfikacja terenu) ───
 
 async function fetchFromOverpass(lat, lng) {
+  // Wąski promień wokół punktu (45m zamiast 300m) — sprawdza rzeczywisty teren pod pinezką
   const query = `
-    [out:json][timeout:10];
+    [out:json][timeout:8];
     (
-      way["natural"="wood"](around:300,${lat},${lng});
-      way["landuse"="forest"](around:300,${lat},${lng});
-      relation["natural"="wood"](around:300,${lat},${lng});
-      relation["landuse"="forest"](around:300,${lat},${lng});
+      way["natural"~"^(wood|tree_row|scrub|heath|grassland|wetland|water)$"](around:45,${lat},${lng});
+      way["landuse"~"^(forest|meadow|grass|farmland|orchard|allotments|village_green|recreation_ground|residential|commercial|industrial|retail|construction|cemetery)$"](around:45,${lat},${lng});
+      way["building"](around:30,${lat},${lng});
+      way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|service)$"](around:25,${lat},${lng});
+      relation["natural"~"^(wood|water|wetland)$"](around:45,${lat},${lng});
+      relation["landuse"~"^(forest|meadow|grass|farmland|residential)$"](around:45,${lat},${lng});
     );
     out tags;
   `;
@@ -279,39 +343,129 @@ async function fetchFromOverpass(lat, lng) {
   const res = await fetch(OVERPASS_BASE, {
     method: 'POST',
     body: `data=${encodeURIComponent(query)}`,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    signal: AbortSignal.timeout(10000),
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Grzybomapa/2.0 (https://bartnik-hue.github.io/Grzybomapa)'
+    },
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!res.ok) return null;
   const data = await res.json();
   if (!data.elements?.length) return null;
 
-  const el   = data.elements[0];
-  const tags = el.tags || {};
+  const elements = data.elements;
 
-  const leafType = tags.leaf_type;
-  const name     = tags.name || tags['name:pl'] || 'Las';
+  // 1. Sprawdź czy to las / zadrzewienie
+  const forestEl = elements.find(el => {
+    const t = el.tags || {};
+    return t.natural === 'wood' || t.landuse === 'forest';
+  });
 
-  let speciesCodes = [];
-  if      (leafType === 'needleleaved') speciesCodes = ['So'];
-  else if (leafType === 'broadleaved')  speciesCodes = ['Db'];
-  else if (leafType === 'mixed')        speciesCodes = ['So', 'Db'];
-  else                                  speciesCodes = ['So'];
+  if (forestEl) {
+    const tags = forestEl.tags || {};
+    const leafType = tags.leaf_type;
+    const name = tags.name || tags['name:pl'] || 'Las prywatny / komunalny';
 
-  return {
-    source: 'OSM_Overpass',
-    forestName: name,
-    nadlesnictwo: null,
-    rdlp: null,
-    speciesCodes,
-    habitatCode: null,
-    area: null,
-    rawCode: leafType || 'unknown',
-    specAge: null,
-    adrFor: null,
-    _feature: null,
-  };
+    let speciesCodes = [];
+    if      (leafType === 'needleleaved') speciesCodes = ['So'];
+    else if (leafType === 'broadleaved')  speciesCodes = ['Db'];
+    else if (leafType === 'mixed')        speciesCodes = ['So', 'Db'];
+    else                                  speciesCodes = ['So'];
+
+    return {
+      source: 'OSM_Overpass',
+      isForest: true,
+      terrainType: 'forest',
+      forestName: name,
+      nadlesnictwo: null,
+      rdlp: null,
+      speciesCodes,
+      habitatCode: null,
+      area: null,
+      rawCode: leafType || 'unknown',
+      specAge: null,
+      adrFor: null,
+      _feature: null,
+    };
+  }
+
+  // 2. Sprawdź czy to zbiornik wodny
+  const waterEl = elements.find(el => {
+    const t = el.tags || {};
+    return t.natural === 'water' || t.waterway;
+  });
+  if (waterEl) {
+    return {
+      source: 'OSM_Overpass',
+      isForest: false,
+      terrainType: 'water',
+      forestName: waterEl.tags?.name || 'Akwen / Zbiornik wodny',
+      nadlesnictwo: null,
+      rdlp: null,
+      speciesCodes: [],
+      habitatCode: null,
+      area: null,
+      rawCode: null,
+      specAge: null,
+      adrFor: null,
+      _feature: null,
+    };
+  }
+
+  // 3. Sprawdź czy to łąka, pole uprawne, pastwisko
+  const meadowEl = elements.find(el => {
+    const t = el.tags || {};
+    return ['meadow', 'grass', 'farmland', 'orchard', 'allotments', 'village_green', 'recreation_ground'].includes(t.landuse) ||
+           ['grassland', 'heath', 'scrub'].includes(t.natural);
+  });
+  if (meadowEl) {
+    const t = meadowEl.tags || {};
+    const label = t.landuse === 'farmland'
+      ? 'Pole uprawne'
+      : (t.landuse === 'orchard' ? 'Sad' : 'Teren otwarty (łąka / pastwisko)');
+    return {
+      source: 'OSM_Overpass',
+      isForest: false,
+      terrainType: 'meadow',
+      forestName: t.name || label,
+      nadlesnictwo: null,
+      rdlp: null,
+      speciesCodes: [],
+      habitatCode: null,
+      area: null,
+      rawCode: null,
+      specAge: null,
+      adrFor: null,
+      _feature: null,
+    };
+  }
+
+  // 4. Sprawdź czy to teren zabudowany / miejski
+  const urbanEl = elements.find(el => {
+    const t = el.tags || {};
+    return ['residential', 'commercial', 'industrial', 'retail', 'construction', 'cemetery'].includes(t.landuse) ||
+           t.building || t.highway;
+  });
+  if (urbanEl) {
+    return {
+      source: 'OSM_Overpass',
+      isForest: false,
+      terrainType: 'urban',
+      forestName: urbanEl.tags?.name || 'Obszar zurbanizowany (zabudowa / drogi)',
+      nadlesnictwo: null,
+      rdlp: null,
+      speciesCodes: [],
+      habitatCode: null,
+      area: null,
+      rawCode: null,
+      specAge: null,
+      adrFor: null,
+      _feature: null,
+    };
+  }
+
+  return null;
 }
 
 // ── Pomocnicze (dla nadleśnictwa) ──────────────────────────────────
