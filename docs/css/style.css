@@ -729,21 +729,6 @@ html, body {
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.03);
   transition: color 0.2s, border-color 0.2s, background 0.2s;
-}
-.wiki-link.grzyby-link {
-  border-color: rgba(200, 140, 60, 0.35);
-  background: rgba(200, 140, 60, 0.08);
-  color: #dfaa60;
-}
-.wiki-link.grzyby-link:hover {
-  border-color: #dfaa60;
-  color: #fff;
-  background: rgba(200, 140, 60, 0.18);
-}
-.grzyby-link-icon {
-  font-size: 13px;
-  line-height: 1;
-}
 .wiki-link:hover {
   color: #fff;
   border-color: #a0a0a0;

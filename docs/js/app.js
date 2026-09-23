@@ -780,15 +780,6 @@ function renderMushrooms() {
             <span>🕓 +${m.ecology.daysAfter?.[0]}–${m.ecology.daysAfter?.[1]} dni po deszczu</span>
           </div>` : ''}
           <div class="wiki-row">
-            ${m.grzybyUrl ? `
-            <a class="wiki-link grzyby-link"
-               href="${m.grzybyUrl}"
-               target="_blank" rel="noopener noreferrer"
-               onclick="event.stopPropagation()"
-               title="Otwórz atlas na grzyby.pl">
-              <span class="grzyby-link-icon">🍄</span>
-              grzyby.pl — <em>${m.name.split(' (')[0]}</em>
-            </a>` : ''}
             <a class="wiki-link"
                href="https://pl.wikipedia.org/wiki/${encodeURIComponent(m.latin.replace(/ /g,'_'))}"
                target="_blank" rel="noopener noreferrer"
