@@ -714,6 +714,15 @@ function renderMushrooms() {
             <span>🕓 +${m.ecology.daysAfter?.[0]}–${m.ecology.daysAfter?.[1]} dni po deszczu</span>
           </div>` : ''}
           <div class="wiki-row">
+            ${m.grzybyUrl ? `
+            <a class="wiki-link grzyby-link"
+               href="${m.grzybyUrl}"
+               target="_blank" rel="noopener noreferrer"
+               onclick="event.stopPropagation()"
+               title="Otwórz atlas na grzyby.pl">
+              <span class="grzyby-link-icon">🍄</span>
+              grzyby.pl — <em>${m.name.split(' (')[0]}</em>
+            </a>` : ''}
             <a class="wiki-link"
                href="https://pl.wikipedia.org/wiki/${encodeURIComponent(m.latin.replace(/ /g,'_'))}"
                target="_blank" rel="noopener noreferrer"
@@ -730,9 +739,9 @@ function renderMushrooms() {
   }).join('');
 
   let html = '';
-  if (edible.length)  html += `<div class="mushroom-group-label">🍄 Jadalne (${edible.length})</div>${renderGroup(edible, 22)}`;
-  if (caution.length) html += `<div class="mushroom-group-label warn">⚠️ Uwaga / niejadalne (${caution.length})</div>${renderGroup(caution, 8)}`;
-  if (toxic.length)   html += `<div class="mushroom-group-label danger">☠️ Trujące — ostrzeżenie (${toxic.length})</div>${renderGroup(toxic, 8)}`;
+  if (edible.length)  html += `<div class="mushroom-group-label">🍄 Jadalne (${edible.length})</div>${renderGroup(edible, 40)}`;
+  if (caution.length) html += `<div class="mushroom-group-label warn">⚠️ Uwaga / niejadalne (${caution.length})</div>${renderGroup(caution, 15)}`;
+  if (toxic.length)   html += `<div class="mushroom-group-label danger">☠️ Trujące — ostrzeżenie (${toxic.length})</div>${renderGroup(toxic, 15)}`;
 
   el.innerHTML = html;
 }
