@@ -80,176 +80,161 @@ export async function getForestData(lat, lng) {
  * Pobierz granicę wydzielenia jako GeoJSON Feature (do rysowania na mapie)
  */
 export async function getForestBoundary(lat, lng) {
-  const collection = findCollection(lat, lng);
-  if (!collection) return null;
+  const collections = findCandidateCollections(lat, lng);
+  if (!collections.length) return null;
 
-  const delta = 0.008; // ~800m — szersza siatka by na pewno złapać wydzielenie
+  const delta = 0.008; // ~800m
   const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
 
-  const url = `${OGC_BASE}/${collection.id}/items?f=json&bbox=${bbox}&limit=10`;
+  for (const collection of collections) {
+    const url = `${OGC_BASE}/${collection.id}/items?f=json&bbox=${bbox}&limit=25`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data.features?.length) continue;
 
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.features?.length) return null;
-
-    // Znajdź wydzielenie zawierające punkt
-    const hit = findContainingFeature(data.features, lat, lng);
-    return hit || null;
-  } catch {
-    return null;
-  }
-}
-
-// ── OGC API ────────────────────────────────────────────────────────
-
-function findCollection(lat, lng) {
-  return RDLP_COLLECTIONS.find(r =>
-    lat >= r.minLat && lat <= r.maxLat &&
-    lng >= r.minLng && lng <= r.maxLng
-  ) || null;
-}
-
-/**
- * Pobierz dane z OGC API LP (pygeoapi, CORS: *)
- * Używa BBOX ~800m i point-in-polygon do wybrania właściwego wydzielenia
- */
-async function fetchFromOGC(lat, lng) {
-  const collection = findCollection(lat, lng);
-  if (!collection) {
-    console.warn('[ForestAPI] Punkt poza zasięgiem LP:', lat, lng);
-    return null;
-  }
-
-  // BBOX ok. 800m wokół punktu — zbieramy kilka wydzieleń i wybieramy to zawierające punkt
-  const delta = 0.008;
-  const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
-  const url = `${OGC_BASE}/${collection.id}/items?f=json&bbox=${bbox}&limit=20`;
-
-  console.log('[ForestAPI] OGC request:', url);
-
-  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-  if (!res.ok) {
-    console.warn('[ForestAPI] OGC HTTP error:', res.status);
-    return null;
-  }
-
-  const data = await res.json();
-  console.log('[ForestAPI] OGC matched:', data.numberMatched, 'returned:', data.numberReturned);
-
-  if (!data.features?.length) return null;
-
-  // Wybierz wydzielenie zawierające punkt GPS (point-in-polygon)
-  const feature = findContainingFeature(data.features, lat, lng);
-  if (!feature) {
-    // Punkt leży poza granicami jakiegokolwiek wydzielenia leśnego LP
-    return null;
-  }
-  const props = feature.properties || {};
-
-  const speciesCode = props.species_cd || null;
-  const habitatCode = props.site_type  || null;
-  const nazwaRaw    = props.nazwa      || '';
-  const area        = props.sub_area   || null;
-  const specAge     = props.spec_age   || null;
-  const adrFor      = props.adr_for    || null;
-  const areaType    = (props.area_type || '').toUpperCase();
-
-  const rdlpName     = collection.id.replace('RDLP_', '').replace('_wydzielenia', '');
-  const nadlesnictwo = extractNadlesnictwo(nazwaRaw, rdlpName);
-
-  // Weryfikacja typu powierzchni LP — czy to faktyczny drzewostan / las czy np. łąka, woda, bagno
-  if (areaType.includes('WODA') || areaType.includes('RZEKA')) {
-    return {
-      source: 'OGC_LP',
-      isForest: false,
-      terrainType: 'water',
-      forestName: 'Zbiornik wodny / rzeka (LP)',
-      nadlesnictwo,
-      rdlp: rdlpName,
-      speciesCodes: [],
-      habitatCode: null,
-      area: area ? `${Number(area).toFixed(1)} ha` : null,
-      rawCode: null,
-      specAge: null,
-      adrFor,
-      _feature: feature,
-    };
-  }
-
-  if (['ŁĄKA', 'LAKA', 'ROLNE', 'PASTW'].some(t => areaType.includes(t))) {
-    return {
-      source: 'OGC_LP',
-      isForest: false,
-      terrainType: 'meadow',
-      forestName: 'Łąka leśna / Teren otwarty (LP)',
-      nadlesnictwo,
-      rdlp: rdlpName,
-      speciesCodes: [],
-      habitatCode: habitatCode,
-      area: area ? `${Number(area).toFixed(1)} ha` : null,
-      rawCode: null,
-      specAge: null,
-      adrFor,
-      _feature: feature,
-    };
-  }
-
-  const speciesCodes = parseSpeciesCode(speciesCode);
-  const forestName   = parseNazwaLP(nazwaRaw, collection.id);
-
-  return {
-    source: 'OGC_LP',
-    isForest: true,
-    terrainType: 'forest',
-    forestName,
-    nadlesnictwo,
-    rdlp: rdlpName,
-    speciesCodes,
-    habitatCode,
-    area: area ? `${Number(area).toFixed(1)} ha` : null,
-    rawCode: speciesCode,
-    specAge: specAge ? `${specAge} lat` : null,
-    adrFor,
-    _feature: feature, // zachowaj geometrię do rysowania granicy
-  };
-}
-
-// ── Algorytm point-in-polygon (ray casting) ────────────────────────
-
-/**
- * Znajdź wydzielenie które zawiera punkt (lat, lng)
- * Obsługuje MultiPolygon i Polygon
- */
-function findContainingFeature(features, lat, lng) {
-  for (const f of features) {
-    if (geometryContains(f.geometry, lat, lng)) return f;
+      const hit = findBestFeature(data.features, lat, lng, 70);
+      if (hit?.feature) return hit.feature;
+    } catch {
+      continue;
+    }
   }
   return null;
 }
 
-function geometryContains(geometry, lat, lng) {
-  if (!geometry) return false;
-  const type = geometry.type;
+// ── OGC API ────────────────────────────────────────────────────────
 
-  if (type === 'Polygon') {
-    return polygonContains(geometry.coordinates, lat, lng);
-  }
-  if (type === 'MultiPolygon') {
-    return geometry.coordinates.some(poly => polygonContains(poly, lat, lng));
-  }
-  return false;
+function findCandidateCollections(lat, lng) {
+  const matches = RDLP_COLLECTIONS.filter(r =>
+    lat >= r.minLat && lat <= r.maxLat &&
+    lng >= r.minLng && lng <= r.maxLng
+  );
+  // Sortuj według odległości od środka zasięgu kolekcji (najbliższa RDLP najpierw)
+  return matches.sort((a, b) => {
+    const centerALat = (a.minLat + a.maxLat) / 2;
+    const centerALng = (a.minLng + a.maxLng) / 2;
+    const centerBLat = (b.minLat + b.maxLat) / 2;
+    const centerBLng = (b.minLng + b.maxLng) / 2;
+    const distA = (lat - centerALat)**2 + (lng - centerALng)**2;
+    const distB = (lat - centerBLat)**2 + (lng - centerBLng)**2;
+    return distA - distB;
+  });
 }
 
 /**
- * Ray-casting: czy punkt [lng, lat] jest wewnątrz wielokąta
- * GeoJSON: coords = [outerRing, ...holes], każdy ring = [[lng,lat], ...]
+ * Pobierz dane z OGC API LP (pygeoapi, CORS: *)
+ * Używa BBOX ~800m oraz tolerancji bufora (70m dla ścieżek leśnych/linii oddziałowych)
  */
-function polygonContains(rings, lat, lng) {
-  if (!rings?.length) return false;
-  // Sprawdź tylko zewnętrzny ring (otwory ignorujemy — rzadko mamy dziury w wydzieleniach)
-  return pointInRing(rings[0], lng, lat);
+async function fetchFromOGC(lat, lng) {
+  const collections = findCandidateCollections(lat, lng);
+  if (!collections.length) {
+    console.warn('[ForestAPI] Punkt poza zasięgiem LP:', lat, lng);
+    return null;
+  }
+
+  const delta = 0.008;
+  const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
+
+  for (const collection of collections) {
+    const url = `${OGC_BASE}/${collection.id}/items?f=json&bbox=${bbox}&limit=25`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      if (!data.features?.length) continue;
+
+      // Wybierz wydzielenie: wewnątrz poligonu lub w promieniu ścieżki leśnej (do 70m)
+      const match = findBestFeature(data.features, lat, lng, 70);
+      if (!match) continue;
+
+      const feature = match.feature;
+      const props = feature.properties || {};
+
+      const speciesCode = props.species_cd || null;
+      const habitatCode = props.site_type  || null;
+      const nazwaRaw    = props.nazwa      || '';
+      const area        = props.sub_area   || null;
+      const specAge     = props.spec_age   || null;
+      const adrFor      = props.adr_for    || null;
+      const areaType    = (props.area_type || '').toUpperCase();
+
+      const rdlpName     = collection.id.replace('RDLP_', '').replace('_wydzielenia', '');
+      const nadlesnictwo = extractNadlesnictwo(nazwaRaw, rdlpName);
+
+      // Weryfikacja typu powierzchni LP — czy to faktyczny drzewostan / las czy np. łąka, woda, bagno
+      if (areaType.includes('WODA') || areaType.includes('RZEKA')) {
+        return {
+          source: 'OGC_LP',
+          isForest: false,
+          terrainType: 'water',
+          forestName: 'Zbiornik wodny / rzeka (LP)',
+          nadlesnictwo,
+          rdlp: rdlpName,
+          speciesCodes: [],
+          habitatCode: null,
+          area: area ? `${Number(area).toFixed(1)} ha` : null,
+          rawCode: null,
+          specAge: null,
+          adrFor,
+          _feature: feature,
+        };
+      }
+
+      if (['ŁĄKA', 'LAKA', 'ROLNE', 'PASTW'].some(t => areaType.includes(t))) {
+        return {
+          source: 'OGC_LP',
+          isForest: false,
+          terrainType: 'meadow',
+          forestName: 'Łąka leśna / Teren otwarty (LP)',
+          nadlesnictwo,
+          rdlp: rdlpName,
+          speciesCodes: [],
+          habitatCode: habitatCode,
+          area: area ? `${Number(area).toFixed(1)} ha` : null,
+          rawCode: null,
+          specAge: null,
+          adrFor,
+          _feature: feature,
+        };
+      }
+
+      const speciesCodes = parseSpeciesCode(speciesCode);
+      const forestName   = parseNazwaLP(nazwaRaw, collection.id);
+
+      return {
+        source: 'OGC_LP',
+        isForest: true,
+        terrainType: 'forest',
+        forestName,
+        nadlesnictwo,
+        rdlp: rdlpName,
+        speciesCodes,
+        habitatCode,
+        area: area ? `${Number(area).toFixed(1)} ha` : null,
+        rawCode: speciesCode,
+        specAge: specAge ? `${specAge} lat` : null,
+        adrFor,
+        _feature: feature,
+      };
+    } catch (e) {
+      console.warn(`[ForestAPI] OGC collection ${collection.id} error:`, e.message);
+      continue;
+    }
+  }
+
+  return null;
+}
+
+// ── Algorytm geometrii (point-in-polygon & bufor ścieżek leśnych) ───
+
+function distToSegmentSquared(px, py, vx, vy, wx, wy) {
+  const l2 = (vx - wx)**2 + (vy - wy)**2;
+  if (l2 === 0) return (px - vx)**2 + (py - vy)**2;
+  let t = ((px - vx) * (wx - vx) + (py - vy) * (wy - vy)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return (px - (vx + t * (wx - vx)))**2 + (py - (vy + t * (wy - vy)))**2;
 }
 
 function pointInRing(ring, x, y) {
@@ -264,33 +249,104 @@ function pointInRing(ring, x, y) {
   return inside;
 }
 
+function distanceToGeometryMeters(geometry, lat, lng) {
+  if (!geometry) return Infinity;
+  if (geometry.type === 'Polygon') {
+    if (pointInRing(geometry.coordinates[0], lng, lat)) return 0;
+  } else if (geometry.type === 'MultiPolygon') {
+    for (const poly of geometry.coordinates) {
+      if (pointInRing(poly[0], lng, lat)) return 0;
+    }
+  }
+
+  const polygons = geometry.type === 'Polygon'
+    ? [geometry.coordinates]
+    : (geometry.type === 'MultiPolygon' ? geometry.coordinates : []);
+  let minD2 = Infinity;
+
+  for (const rings of polygons) {
+    const ring = rings[0];
+    if (!ring) continue;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const d2 = distToSegmentSquared(lng, lat, ring[i][0], ring[i][1], ring[j][0], ring[j][1]);
+      if (d2 < minD2) minD2 = d2;
+    }
+  }
+
+  return Math.sqrt(minD2) * 111000;
+}
+
+/**
+ * Znajdź wydzielenie leśne:
+ *  1. Dokładnie zawierające punkt (d = 0)
+ *  2. Najbliższe w tolerancji maxToleranceMeters (dla ścieżek, dróg leśnych, linii oddziałowych)
+ *  Zwraca null jeśli najbliższy las jest dalej (pole, łąka, miasto)
+ */
+function findBestFeature(features, lat, lng, maxToleranceMeters = 70) {
+  if (!features?.length) return null;
+
+  for (const f of features) {
+    if (distanceToGeometryMeters(f.geometry, lat, lng) === 0) {
+      return { feature: f, distance: 0, isInside: true };
+    }
+  }
+
+  let best = null;
+  let minD = Infinity;
+
+  for (const f of features) {
+    const d = distanceToGeometryMeters(f.geometry, lat, lng);
+    if (d < minD) {
+      minD = d;
+      best = f;
+    }
+  }
+
+  if (best && minD <= maxToleranceMeters) {
+    return { feature: best, distance: minD, isInside: false };
+  }
+
+  return null;
+}
+
 // ── Parsowanie pól LP ──────────────────────────────────────────────
 
 /**
  * Parsuj kod gatunkowy LP
  * "SO" → ['So'] | "6So4Db2Bk" → ['So','Db','Bk'] | "SO DB" → ['So','Db']
  */
+const LP_TO_NORM = {
+  'SO': 'So', 'SW': 'Sw', 'ŚW': 'Sw', 'JD': 'Jd', 'MD': 'Md',
+  'DB': 'Db', 'DBCZ': 'Dbcz', 'BK': 'Bk', 'GB': 'Gb', 'BRZ': 'Brz',
+  'LP': 'Lp', 'JS': 'Js', 'KL': 'Kl', 'OL': 'Ol', 'OS': 'Os',
+  'TP': 'Tp', 'WZ': 'Wz', 'LSZ': 'Lsz', 'WB': 'Wb', 'JW': 'Jw', 'CZR': 'Czr',
+};
+
+/**
+ * Parsuj kod gatunkowy LP
+ * "SO" → ['So'] | "6So4Db2Bk" → ['So','Db','Bk'] | "10SO" → ['So'] | "SO DB" → ['So','Db']
+ */
 function parseSpeciesCode(code) {
   if (!code) return [];
+  const upper = code.toUpperCase().trim();
 
-  // Format "6So4Db2Bk" — z cyframi
-  const withNums = code.match(/\d*([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]*)/g);
-  if (withNums?.length) {
-    return withNums.map(m => {
-      const clean = m.replace(/^\d+/, '');
-      return normalizeCode(clean);
-    });
+  // 1. Sprawdź czy to pojedynczy znany kod, np. "SO", "BRZ", "ŚW"
+  if (LP_TO_NORM[upper]) return [LP_TO_NORM[upper]];
+
+  // 2. Jeśli format z udziałami np. "6SO 4DB" lub "6SO4DB" lub "7SO2DB1BRZ" lub "6So4Db"
+  const knownKeys = Object.keys(LP_TO_NORM).sort((a,b) => b.length - a.length);
+  const regex = new RegExp(`(\\d*)\\s*(${knownKeys.join('|')})`, 'g');
+  const matches = [...upper.matchAll(regex)];
+
+  if (matches.length > 0) {
+    const list = matches.map(m => LP_TO_NORM[m[2]]).filter(Boolean);
+    if (list.length > 0) return [...new Set(list)];
   }
 
-  // Spacja-separated "SO DB"
-  const parts = code.trim().split(/\s+/);
-  return parts.map(normalizeCode).filter(Boolean);
-}
-
-/** Normalizuj kod: "SO" → "So", "DB" → "Db" */
-function normalizeCode(code) {
-  if (!code) return '';
-  return code.charAt(0).toUpperCase() + code.slice(1).toLowerCase();
+  // 3. Fallback: słowa rozdzielone spacjami
+  const parts = upper.split(/\s+/);
+  const res = parts.map(p => LP_TO_NORM[p] || (p.charAt(0) + p.slice(1).toLowerCase())).filter(Boolean);
+  return res.length ? [...new Set(res)] : [];
 }
 
 /**
@@ -326,16 +382,20 @@ function formatRDLPName(collectionId) {
 // ── Overpass API (fallback dla lasów niepaństwowych i klasyfikacja terenu) ───
 
 async function fetchFromOverpass(lat, lng) {
-  // Wąski promień wokół punktu (45m zamiast 300m) — sprawdza rzeczywisty teren pod pinezką
+  // Wąski promień wokół punktu — sprawdza rzeczywisty teren pod pinezką
   const query = `
-    [out:json][timeout:8];
+    [out:json][timeout:3];
     (
-      way["natural"~"^(wood|tree_row|scrub|heath|grassland|wetland|water)$"](around:45,${lat},${lng});
-      way["landuse"~"^(forest|meadow|grass|farmland|orchard|allotments|village_green|recreation_ground|residential|commercial|industrial|retail|construction|cemetery)$"](around:45,${lat},${lng});
+      way["natural"="wood"](around:50,${lat},${lng});
+      way["landuse"="forest"](around:50,${lat},${lng});
+      way["natural"="water"](around:40,${lat},${lng});
+      way["waterway"](around:30,${lat},${lng});
       way["building"](around:30,${lat},${lng});
-      way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|service)$"](around:25,${lat},${lng});
-      relation["natural"~"^(wood|water|wetland)$"](around:45,${lat},${lng});
-      relation["landuse"~"^(forest|meadow|grass|farmland|residential)$"](around:45,${lat},${lng});
+      way["landuse"="residential"](around:35,${lat},${lng});
+      way["landuse"="meadow"](around:50,${lat},${lng});
+      way["landuse"="farmland"](around:50,${lat},${lng});
+      relation["natural"="wood"](around:50,${lat},${lng});
+      relation["landuse"="forest"](around:50,${lat},${lng});
     );
     out tags;
   `;
@@ -347,7 +407,7 @@ async function fetchFromOverpass(lat, lng) {
       'Content-Type': 'application/x-www-form-urlencoded',
       'User-Agent': 'Grzybomapa/2.0 (https://bartnik-hue.github.io/Grzybomapa)'
     },
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(2500),
   });
 
   if (!res.ok) return null;

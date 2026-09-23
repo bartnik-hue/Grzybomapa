@@ -316,9 +316,17 @@ async function loadAllData(lat, lng) {
   }
 }
 
+const LP_TO_NORM = {
+  'SO': 'So', 'SW': 'Sw', 'ŚW': 'Sw', 'JD': 'Jd', 'MD': 'Md',
+  'DB': 'Db', 'DBCZ': 'Dbcz', 'BK': 'Bk', 'GB': 'Gb', 'BRZ': 'Brz',
+  'LP': 'Lp', 'JS': 'Js', 'KL': 'Kl', 'OL': 'Ol', 'OS': 'Os',
+  'TP': 'Tp', 'WZ': 'Wz', 'LSZ': 'Lsz', 'WB': 'Wb', 'JW': 'Jw', 'CZR': 'Czr',
+};
+
 /**
  * Parsuj rawCode LP do tablicy z procentami dla scoringu
  * "6So4Db2Bk" → [{code:'So',pct:60},{code:'Db',pct:40},{code:'Bk',pct:20}]
+ * "10SO"      → [{code:'So',pct:100}]
  * "SO"        → [{code:'So',pct:100}]
  */
 function parseCompositionForScoring(rawCode, speciesCodes) {
@@ -327,26 +335,37 @@ function parseCompositionForScoring(rawCode, speciesCodes) {
     return (speciesCodes || []).map(c => ({ code: c, pct: Math.round(100 / n) }));
   }
 
-  // Format z cyframi: "6So4Db"
-  const withNums = rawCode.match(/(\d+)([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]*)/g);
-  if (withNums?.length) {
-    return withNums.map(m => {
-      const num  = parseInt(m.match(/^(\d+)/)?.[1] || '1', 10);
-      const code = m.replace(/^\d+/, '');
-      return {
-        code: code.charAt(0).toUpperCase() + code.slice(1).toLowerCase(),
-        pct: num * 10,
-      };
+  const upper = rawCode.toUpperCase().trim();
+  const knownKeys = Object.keys(LP_TO_NORM).sort((a,b) => b.length - a.length);
+  const regex = new RegExp(`(\\d+)?\\s*(${knownKeys.join('|')})`, 'g');
+  const matches = [...upper.matchAll(regex)];
+
+  if (matches.length > 0) {
+    let items = matches.map(m => {
+      const num = m[1] ? parseInt(m[1], 10) : null;
+      const code = LP_TO_NORM[m[2]];
+      return { code, num };
     });
+
+    const hasNums = items.some(it => it.num !== null);
+    if (hasNums) {
+      const totalNum = items.reduce((sum, it) => sum + (it.num || 1), 0);
+      return items.map(it => ({
+        code: it.code,
+        pct: totalNum <= 10 ? ((it.num || 1) * 10) : Math.round(((it.num || 1) / totalNum) * 100)
+      }));
+    } else {
+      const eqPct = Math.round(100 / items.length);
+      return items.map(it => ({ code: it.code, pct: eqPct }));
+    }
   }
 
-  // Prosty kod: "SO" lub "SO DB" — równe udziały
-  const parts = rawCode.trim().split(/\s+/);
-  const eqPct = Math.round(100 / parts.length);
-  return parts.map(p => ({
-    code: p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(),
-    pct: eqPct,
-  }));
+  if (speciesCodes?.length) {
+    const eqPct = Math.round(100 / speciesCodes.length);
+    return speciesCodes.map(c => ({ code: c, pct: eqPct }));
+  }
+
+  return [];
 }
 
 // ── Renderowanie ───────────────────────────────────────────────────
@@ -463,37 +482,52 @@ function renderForestInfo() {
 /**
  * Rozszyfruj kod składu gatunkowego LP
  * "6So4Db2Bk" → [{pct:60, name:'Sosna', latin:'Pinus sylvestris'}, ...]
- * "SO"         → [{pct:null, name:'Sosna', latin:'Pinus sylvestris'}]
+ * "10SO"      → [{pct:100, name:'Sosna', latin:'Pinus sylvestris'}]
+ * "SO"        → [{pct:null, name:'Sosna', latin:'Pinus sylvestris'}]
  */
 function decodeComposition(rawCode) {
   if (!rawCode) return [];
 
-  // Format z cyframi: "6So4Db2Bk" — cyfra to dziesiąte części (6 = 60%)
-  const withNums = rawCode.match(/(\d+)([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]*)/g);
-  if (withNums?.length) {
-    return withNums.map(m => {
-      const num  = parseInt(m.match(/^(\d+)/)?.[1] || '0', 10);
-      const code = m.replace(/^\d+/, '');
-      const norm = code.charAt(0).toUpperCase() + code.slice(1).toLowerCase();
-      const spec = TREE_SPECIES[norm];
+  const upper = rawCode.toUpperCase().trim();
+  const knownKeys = Object.keys(LP_TO_NORM).sort((a,b) => b.length - a.length);
+  const regex = new RegExp(`(\\d+)?\\s*(${knownKeys.join('|')})`, 'g');
+  const matches = [...upper.matchAll(regex)];
+
+  if (matches.length > 0) {
+    let items = matches.map(m => {
+      const num = m[1] ? parseInt(m[1], 10) : null;
+      const norm = LP_TO_NORM[m[2]];
+      return { norm, num };
+    });
+
+    const hasNums = items.some(it => it.num !== null);
+    const totalNum = hasNums ? items.reduce((sum, it) => sum + (it.num || 1), 0) : null;
+
+    return items.map(it => {
+      const spec = TREE_SPECIES[it.norm];
+      let pct = null;
+      if (hasNums) {
+        pct = totalNum <= 10 ? ((it.num || 1) * 10) : Math.round(((it.num || 1) / totalNum) * 100);
+      }
       return {
-        pct:   num * 10,
-        code:  norm,
-        name:  spec?.name  || norm,
+        pct,
+        code: it.norm,
+        name: spec?.name || it.norm,
         latin: spec?.latin || '',
       };
     });
   }
 
-  // Prosty kod bez cyfr: "SO" lub "SO DB"
+  // Fallback: prosty kod
   const parts = rawCode.trim().split(/\s+/);
   return parts.map(p => {
-    const norm = p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+    const upperP = p.toUpperCase();
+    const norm = LP_TO_NORM[upperP] || (p.charAt(0).toUpperCase() + p.slice(1).toLowerCase());
     const spec = TREE_SPECIES[norm];
     return {
-      pct:   null,
-      code:  norm,
-      name:  spec?.name  || norm,
+      pct: null,
+      code: norm,
+      name: spec?.name || norm,
       latin: spec?.latin || '',
     };
   });
