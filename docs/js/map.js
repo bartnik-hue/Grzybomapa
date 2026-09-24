@@ -17,9 +17,8 @@ let onMapClickCb = null;    // callback(lat, lng) przy kliknięciu
 // Stan nakładki szlaków
 let _showTrails = false;
 
-// Stan nakładek typów lasu
-let _showDeciduous = false;
-let _showConiferous = false;
+// Stan nakładki gatunków drzew
+let _showTreeSpecies = false;
 let _forestTypeLoading = false;
 
 const WMS_BDL_URL = 'https://mapserver.bdl.lasy.gov.pl/ArcGIS/services/WMS_BDL_Mapa_turystyczna/MapServer/WMSServer';
@@ -93,12 +92,7 @@ function forestTypeStyle(feature) {
   const code = feature.properties?.species_cd || '';
   const type = getPrimaryForestType(code);
 
-  const visible =
-    (type === 'deciduous'  && _showDeciduous) ||
-    (type === 'coniferous' && _showConiferous) ||
-    (type === 'mixed'      && (_showDeciduous || _showConiferous));
-
-  if (!visible) return { opacity: 0, fillOpacity: 0, weight: 0 };
+  if (!_showTreeSpecies) return { opacity: 0, fillOpacity: 0, weight: 0 };
 
   const palette = {
     deciduous:  { color: '#86ef64', fill: '#86ef64', fo: 0.30 },
@@ -154,7 +148,7 @@ async function fetchFeaturesForView() {
  */
 export async function refreshForestTypeOverlay() {
   if (!map) return;
-  if (!_showDeciduous && !_showConiferous) {
+  if (!_showTreeSpecies) {
     if (forestTypeGeoJSONLayer) {
       map.removeLayer(forestTypeGeoJSONLayer);
       forestTypeGeoJSONLayer = null;
@@ -223,7 +217,7 @@ export function initMap(containerId = 'map') {
 
   // Odśwież nakładkę typów lasu po zakończeniu przesuwania/zoomowania
   map.on('moveend', () => {
-    if (_showDeciduous || _showConiferous) {
+    if (_showTreeSpecies) {
       refreshForestTypeOverlay();
     }
   });
@@ -410,20 +404,15 @@ export function toggleForestLayer(visible) {
 }
 
 /**
- * Przełącz nakładkę lasów liściastych
+ * Przełącz nakładkę gatunków drzew (BDL)
  */
-export async function toggleDeciduousLayer(visible) {
-  _showDeciduous = visible;
+export async function toggleTreeSpeciesLayer(visible) {
+  _showTreeSpecies = visible;
   await refreshForestTypeOverlay();
 }
 
-/**
- * Przełącz nakładkę lasów iglastych
- */
-export async function toggleConiferousLayer(visible) {
-  _showConiferous = visible;
-  await refreshForestTypeOverlay();
-}
+export const toggleDeciduousLayer = toggleTreeSpeciesLayer;
+export const toggleConiferousLayer = toggleTreeSpeciesLayer;
 
 /**
  * Włącz/wyłącz tryb kliknij-na-mapę (pinezka)

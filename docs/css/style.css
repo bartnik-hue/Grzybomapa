@@ -185,6 +185,7 @@ html, body {
 .icon-btn:hover .btn-label {
   color: #fff;
 }
+.icon-btn.active-species .btn-label,
 .icon-btn.active-deciduous .btn-label {
   color: #86ef64 !important;
 }
@@ -1096,6 +1097,7 @@ html, body {
 .heatmap-rect-tooltip::before { display: none !important; }
 
 /* ── Przyciski nakładek typów lasu ───────────────────────────────── */
+#btn-tree-species.active-species,
 #btn-deciduous.active-deciduous {
   background: rgba(134, 239, 100, 0.2) !important;
   color: #86ef64 !important;

@@ -9,7 +9,7 @@ import { getForestData, getForestBoundary } from './forest_api.js';
 import { getWeatherData, weatherCodeToText, weatherCodeToIcon } from './weather.js';
 import { getMushroomsForStand, getMushroomsForMixedForest, filterBySeason, TREE_SPECIES } from './mushroom_knowledge.js';
 import { scoreAllMushrooms, calculateOverallScore, calculateDailyForecastScores, generateSummary, generateDetailedDiagnosis, edibleLabel, scoreToColor, scoreToLabel } from './scoring.js';
-import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleDeciduousLayer, toggleConiferousLayer, toggleTrailsLayer, isTrailsVisible } from './map.js';
+import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleTreeSpeciesLayer, toggleTrailsLayer, isTrailsVisible } from './map.js';
 import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=5.0';
 
 // ── Stan aplikacji ─────────────────────────────────────────────────
@@ -56,8 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('btn-layer-toggle').addEventListener('click', onLayerToggle);
   $('btn-heatmap').addEventListener('click', onHeatmapToggle);
-  $('btn-deciduous').addEventListener('click', onDeciduousToggle);
-  $('btn-coniferous').addEventListener('click', onConiferousToggle);
+  $('btn-tree-species').addEventListener('click', onTreeSpeciesToggle);
   $('btn-trails').addEventListener('click', onTrailsToggle);
 
   // Sprawdź czy Geolocation jest dostępne
@@ -953,35 +952,15 @@ function onHeatmapToggle() {
   }
 }
 
-// ── Nakładki typów lasu ────────────────────────────────────────────
-let deciduousVisible = false;
-let coniferousVisible = false;
+// ── Nakładka gatunków drzew ─────────────────────────────────────────
+let treeSpeciesVisible = false;
 
-function updateForestTypeLegend() {
+function onTreeSpeciesToggle() {
+  treeSpeciesVisible = !treeSpeciesVisible;
+  toggleTreeSpeciesLayer(treeSpeciesVisible);
+  $('btn-tree-species')?.classList.toggle('active-species', treeSpeciesVisible);
   const legend = $('forest-type-legend');
-  if (!legend) return;
-  const anyActive = deciduousVisible || coniferousVisible;
-  legend.classList.toggle('hidden', !anyActive);
-
-  // Przyciemnij nieaktywne pozycje legendy
-  const ftlDec = $('ftl-deciduous');
-  const ftlCon = $('ftl-coniferous');
-  if (ftlDec) ftlDec.style.opacity = deciduousVisible ? '1' : '0.35';
-  if (ftlCon) ftlCon.style.opacity = coniferousVisible ? '1' : '0.35';
-}
-
-function onDeciduousToggle() {
-  deciduousVisible = !deciduousVisible;
-  toggleDeciduousLayer(deciduousVisible);
-  $('btn-deciduous').classList.toggle('active-deciduous', deciduousVisible);
-  updateForestTypeLegend();
-}
-
-function onConiferousToggle() {
-  coniferousVisible = !coniferousVisible;
-  toggleConiferousLayer(coniferousVisible);
-  $('btn-coniferous').classList.toggle('active-coniferous', coniferousVisible);
-  updateForestTypeLegend();
+  if (legend) legend.classList.toggle('hidden', !treeSpeciesVisible);
 }
 
 // ── Szlaki turystyczne LP ─────────────────────────────────────────
