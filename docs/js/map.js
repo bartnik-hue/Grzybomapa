@@ -438,13 +438,12 @@ export function setPin(lat, lng) {
   const pinIcon = L.divIcon({
     className: 'custom-pin-container',
     html: `
-      <div class="pin-marker-wrapper">
-        <div class="pin-badge-label">📌 Próbnik</div>
-        <div class="pin-marker-head">📍</div>
+      <div class="pin-marker-wrapper" title="Próbnik: przeciągnij lub kliknij, aby zbadać to miejsce">
+        <div class="pin-marker-head">🍄</div>
         <div class="pin-marker-pulse"></div>
       </div>`,
-    iconSize: [80, 52],
-    iconAnchor: [40, 50],
+    iconSize: [44, 44],
+    iconAnchor: [22, 38],
   });
 
   if (!pinMarker) {
@@ -465,6 +464,7 @@ export function setPin(lat, lng) {
       onMapClickCb?.(pos.lat, pos.lng);
     });
   } else {
+    pinMarker.setIcon(pinIcon);
     pinMarker.setLatLng([lat, lng]);
   }
 }

@@ -917,7 +917,7 @@ html, body {
   }
 }
 
-/* ── Marker pinezki (tryb ręcznego wyboru punktu) ────── */
+/* ── Marker próbnika (grzybek muchomorek) ─────────────── */
 .custom-pin-container {
   overflow: visible !important;
 }
@@ -928,39 +928,28 @@ html, body {
   position: relative;
   cursor: pointer;
   pointer-events: auto;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.65));
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55));
   animation: pinDrop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   transition: transform 0.15s ease;
 }
 .pin-marker-wrapper:hover {
-  transform: scale(1.1);
+  transform: scale(1.18);
 }
 .pin-marker-wrapper:active {
   cursor: grabbing;
   transform: scale(0.95);
 }
-.pin-badge-label {
-  background: #fbbf24;
-  color: #0b1612;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-  margin-bottom: 2px;
-  letter-spacing: 0.3px;
-  border: 1px solid rgba(255,255,255,0.4);
-}
 .pin-marker-head {
-  font-size: 34px;
+  font-size: 36px;
   line-height: 1;
-  filter: drop-shadow(0 0 10px rgba(251,191,36,0.8));
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.65));
+  user-select: none;
 }
 .pin-marker-pulse {
-  width: 16px;
+  width: 18px;
   height: 6px;
-  background: rgba(251,191,36,0.5);
+  background: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
   border-radius: 50%;
   margin-top: -3px;
   animation: pinPulseRing 1.8s infinite;
