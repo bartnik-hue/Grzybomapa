@@ -145,7 +145,7 @@ async function fetchFromOGC(lat, lng) {
   const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
 
   for (const collection of collections) {
-    const url = `${OGC_BASE}/${collection.id}/items?f=json&bbox=${bbox}&limit=25`;
+    const url = `${OGC_BASE}/${collection.id}/items?f=json&bbox=${bbox}&limit=100`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
       if (!res.ok) continue;
@@ -153,8 +153,8 @@ async function fetchFromOGC(lat, lng) {
       const data = await res.json();
       if (!data.features?.length) continue;
 
-      // Wybierz wydzielenie: wewnątrz poligonu lub w promieniu ścieżki leśnej (do 70m)
-      const match = findBestFeature(data.features, lat, lng, 70);
+      // Wybierz wydzielenie: wewnątrz poligonu lub w promieniu ścieżki leśnej (do 90m)
+      const match = findBestFeature(data.features, lat, lng, 90);
       if (!match) continue;
 
       const feature = match.feature;
@@ -392,19 +392,22 @@ function formatRDLPName(collectionId) {
 // ── Overpass API & Nominatim (detekcja lasów niepaństwowych, miast i terenu) ───
 
 async function fetchFromOverpass(lat, lng) {
-  // Sprawdza lasy prywatne, akweny oraz tereny miejskie/wiejskie wokół punktu
+  // Sprawdza lasy, rezerwaty, akweny oraz tereny miejskie/wiejskie wokół punktu
   const query = `
     [out:json][timeout:4];
     (
-      way["natural"="wood"](around:75,${lat},${lng});
-      way["landuse"="forest"](around:75,${lat},${lng});
-      relation["natural"="wood"](around:75,${lat},${lng});
-      relation["landuse"="forest"](around:75,${lat},${lng});
+      way["natural"="wood"](around:150,${lat},${lng});
+      way["landuse"="forest"](around:150,${lat},${lng});
+      relation["natural"="wood"](around:150,${lat},${lng});
+      relation["landuse"="forest"](around:150,${lat},${lng});
+      way["leisure"="nature_reserve"](around:150,${lat},${lng});
+      relation["leisure"="nature_reserve"](around:150,${lat},${lng});
+      relation["boundary"="national_park"](around:150,${lat},${lng});
       way["natural"="water"](around:50,${lat},${lng});
       way["waterway"](around:35,${lat},${lng});
-      way["building"](around:100,${lat},${lng});
-      way["landuse"~"residential|commercial|industrial|retail|construction|cemetery|garages"](around:120,${lat},${lng});
-      way["highway"~"primary|secondary|tertiary|residential|service|pedestrian|living_street"](around:70,${lat},${lng});
+      way["building"](around:60,${lat},${lng});
+      way["landuse"~"residential|commercial|industrial|retail|construction|cemetery|garages"](around:80,${lat},${lng});
+      way["highway"~"pedestrian|living_street"](around:50,${lat},${lng});
       way["landuse"~"meadow|farmland|orchard|allotments"](around:100,${lat},${lng});
       way["natural"~"grassland|heath|scrub"](around:80,${lat},${lng});
     );
@@ -428,10 +431,12 @@ async function fetchFromOverpass(lat, lng) {
 
     const elements = data.elements;
 
-    // 1. Sprawdź czy to las / zadrzewienie
+    // 1. Sprawdź czy to las / zadrzewienie / rezerwat przyrody (PRIORYTET)
     const forestEl = elements.find(el => {
       const t = el.tags || {};
-      return t.natural === 'wood' || t.landuse === 'forest';
+      return t.natural === 'wood' || t.landuse === 'forest' ||
+             t.leisure === 'nature_reserve' || t.boundary === 'national_park' ||
+             t.boundary === 'protected_area';
     });
 
     if (forestEl) {
@@ -485,12 +490,12 @@ async function fetchFromOverpass(lat, lng) {
       };
     }
 
-    // 3. Sprawdź czy to teren zabudowany / miejski / wieś zabudowana
+    // 3. Sprawdź czy to teren zabudowany / miejski (budynki, strefy zamieszkania, deptaki — NIGDY same drogi leśne!)
     const urbanEl = elements.find(el => {
       const t = el.tags || {};
       return ['residential', 'commercial', 'industrial', 'retail', 'construction', 'cemetery', 'garages'].includes(t.landuse) ||
              t.building ||
-             ['primary', 'secondary', 'tertiary', 'residential', 'service', 'pedestrian', 'living_street'].includes(t.highway);
+             ['pedestrian', 'living_street'].includes(t.highway);
     });
     if (urbanEl) {
       const t = urbanEl.tags || {};
@@ -547,26 +552,131 @@ async function fetchFromOverpass(lat, lng) {
 }
 
 /**
- * Niezawodny fallback Nominatim — precyzyjnie rozpoznaje miasta, miasteczka, wsie oraz pola
+ * Sprawdza czy tekst zawiera słowa kluczowe wskazujące na las, bór, puszczę lub rezerwat
+ */
+function isForestText(text) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  const keywords = [
+    'las ', 'las,', 'las.', 'lasek', 'lasy', 'puszcza', 'bory', 'bór ', 'bor ',
+    'rezerwat', 'park narodowy', 'park krajobrazowy', 'nadleśnictwo', 'leśnictwo',
+    'oddział', 'uroczysko', 'dąbrowa', 'olszyna', 'zagajnik'
+  ];
+  return keywords.some(kw => t.includes(kw));
+}
+
+/**
+ * Niezawodny fallback Nominatim — inteligentnie rozróżnia lasy miejskie, tereny zurbanizowane i łąki
  */
 async function fetchFromNominatim(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Grzybomapa/2.0 (kontakt@grzybomapa.pl)' },
-    signal: AbortSignal.timeout(3500)
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const a = data.address || {};
+  try {
+    const url16 = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`;
+    const res16 = await fetch(url16, {
+      headers: { 'User-Agent': 'Grzybomapa/2.0 (kontakt@grzybomapa.pl)' },
+      signal: AbortSignal.timeout(3500)
+    });
+    if (!res16.ok) return null;
+    const d = await res16.json();
+    const a = d.address || {};
+    const name = d.name || '';
+    const displayName = d.display_name || '';
 
-  // Miasto lub miasteczko
-  const cityName = a.city || a.town || (a.municipality?.toLowerCase().includes('miasto') ? a.municipality : null);
-  if (cityName) {
+    // 1. Sprawdź czy to las / rezerwat / park narodowy (także lasy miejskie, np. Las Kabacki, Las Wolski)
+    const isForest = isForestText(name) || isForestText(displayName) ||
+                     ['wood', 'forest', 'nature_reserve'].includes(d.type) ||
+                     ['wood', 'forest'].includes(d.class);
+
+    if (isForest) {
+      const fName = isForestText(name) ? name : (name ? `Las (${name})` : 'Las / Obszar leśny');
+      return {
+        source: 'OSM_Nominatim',
+        isForest: true,
+        terrainType: 'forest',
+        forestName: fName,
+        nadlesnictwo: null,
+        rdlp: null,
+        speciesCodes: ['So', 'Db'],
+        habitatCode: null,
+        area: null,
+        rawCode: 'mixed',
+        specAge: null,
+        adrFor: null,
+        _feature: null,
+      };
+    }
+
+    // 2. Jeśli zoom=16 nie wykrył lasu, sprawdź zoom=14 pod kątem obszaru leśnego lub rezerwatu
+    try {
+      const url14 = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`;
+      const res14 = await fetch(url14, {
+        headers: { 'User-Agent': 'Grzybomapa/2.0 (kontakt@grzybomapa.pl)' },
+        signal: AbortSignal.timeout(2500)
+      });
+      if (res14.ok) {
+        const d14 = await res14.json();
+        if (isForestText(d14.name) || isForestText(d14.display_name)) {
+          return {
+            source: 'OSM_Nominatim',
+            isForest: true,
+            terrainType: 'forest',
+            forestName: d14.name || 'Las / Rezerwat przyrody',
+            nadlesnictwo: null,
+            rdlp: null,
+            speciesCodes: ['So', 'Db'],
+            habitatCode: null,
+            area: null,
+            rawCode: 'mixed',
+            specAge: null,
+            adrFor: null,
+            _feature: null,
+          };
+        }
+      }
+    } catch {}
+
+    // Ścieżka, dukt lub szlak leśny (path, track, footway) — to NIGDY nie jest miasto/teren zabudowany!
+    const isPathOrTrack = ['path', 'track', 'footway', 'cycleway'].includes(d.type);
+
+    // 3. Sprawdź czy to teren rzeczywiście zurbanizowany (budynki, ulice mieszkalne, numer domu)
+    const hasBuildingOrHouse = !!a.house_number ||
+                               ['building', 'shop', 'amenity', 'office', 'tourism'].includes(d.class) ||
+                               ['house', 'apartments', 'commercial', 'retail', 'pedestrian', 'living_street'].includes(d.type) ||
+                               ['house', 'building', 'city_block'].includes(d.addresstype);
+
+    const cityName = a.city || a.town;
+    const isUrbanStreet = !!cityName && !isPathOrTrack && (
+      ['residential', 'living_street', 'pedestrian'].includes(d.type) ||
+      ['city_block', 'quarter'].includes(d.addresstype) ||
+      (['primary', 'secondary', 'tertiary'].includes(d.type) && !!a.house_number)
+    );
+
+    if (!isPathOrTrack && (hasBuildingOrHouse || isUrbanStreet)) {
+      const cityLabel = cityName || a.village || '';
+      const label = cityLabel ? `Teren miejski / zabudowany (${cityLabel})` : 'Teren miejski / zabudowany';
+      return {
+        source: 'OSM_Nominatim',
+        isForest: false,
+        terrainType: 'urban',
+        forestName: label,
+        nadlesnictwo: null,
+        rdlp: null,
+        speciesCodes: [],
+        habitatCode: null,
+        area: null,
+        rawCode: null,
+        specAge: null,
+        adrFor: null,
+        _feature: null,
+      };
+    }
+
+    // 4. W pozostałych przypadkach to teren otwarty (łąka / pole uprawne)
+    const villageName = a.village || a.hamlet;
     return {
       source: 'OSM_Nominatim',
       isForest: false,
-      terrainType: 'urban',
-      forestName: `Teren miejski (${cityName})`,
+      terrainType: 'meadow',
+      forestName: villageName ? `Teren otwarty (łąka / pole — okolice ${villageName})` : 'Teren otwarty (łąka / pole uprawne)',
       nadlesnictwo: null,
       rdlp: null,
       speciesCodes: [],
@@ -577,50 +687,9 @@ async function fetchFromNominatim(lat, lng) {
       adrFor: null,
       _feature: null,
     };
+  } catch {
+    return null;
   }
-
-  // Sprawdź czy to zabudowa wiejska (wieś / osada z numerem domu, budynkiem lub ulicą osiedlową)
-  const villageName = a.village || a.hamlet;
-  const isVillageSettlement = !!villageName && (
-    !!a.house_number ||
-    data.type === 'residential' ||
-    ['house', 'building', 'residential'].includes(data.addresstype) ||
-    ['building', 'amenity', 'shop', 'office'].includes(data.class)
-  );
-
-  if (isVillageSettlement) {
-    return {
-      source: 'OSM_Nominatim',
-      isForest: false,
-      terrainType: 'urban',
-      forestName: `Teren zabudowany (wieś ${villageName})`,
-      nadlesnictwo: null,
-      rdlp: null,
-      speciesCodes: [],
-      habitatCode: null,
-      area: null,
-      rawCode: null,
-      specAge: null,
-      adrFor: null,
-      _feature: null,
-    };
-  }
-
-  return {
-    source: 'OSM_Nominatim',
-    isForest: false,
-    terrainType: 'meadow',
-    forestName: villageName ? `Teren otwarty (łąka / pole — okolice ${villageName})` : 'Teren otwarty (łąka / pole uprawne)',
-    nadlesnictwo: null,
-    rdlp: null,
-    speciesCodes: [],
-    habitatCode: null,
-    area: null,
-    rawCode: null,
-    specAge: null,
-    adrFor: null,
-    _feature: null,
-  };
 }
 
 // ── Pomocnicze (dla nadleśnictwa) ──────────────────────────────────
