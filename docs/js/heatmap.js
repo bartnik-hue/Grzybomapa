@@ -45,9 +45,9 @@ const RDLP_COLLECTIONS = [
 ];
 
 const AREA_KM     = 10;  // Wymiar obszaru analizy [km × km] (10×10 km stabilny kafelek)
-const GRID_N      = 8;   // 8×8 = 64 punkty wysokościowe pobierane w 1 zapytaniu
-const MASK_N      = 32;  // 32×32 siatka maski leśnej
-const CANVAS_SIZE = 220; // Rozmiar rastra Leaflet
+const GRID_N      = 12;  // 12×12 = 144 punkty wysokościowe (gładka mikrorzeźba)
+const MASK_N      = 64;  // 64×64 siatka maski leśnej (4x wyższa szczegółowość granic)
+const CANVAS_SIZE = 400; // Rozdzielczość rastra Leaflet (wysoka ostrość bez rozmyć)
 const SNAP_LAT    = 0.04; // Krok kotwiczenia siatki geograficznej (~4.4 km)
 const SNAP_LNG    = 0.06; // Krok kotwiczenia siatki geograficznej (~3.8 km)
 
@@ -270,29 +270,85 @@ async function renderAndFetch() {
 }
 
 /**
- * Pobiera oficjalne wydzielenia leśne z OGC API Lasów Państwowych
+ * Pobiera oficjalne wydzielenia leśne z OGC API Lasów Państwowych (z fallbackiem OSM dla parków narodowych/lasów prywatnych)
  */
 async function fetchBdlForestRings(south, west, north, east) {
   const matchingCols = RDLP_COLLECTIONS.filter(r =>
     !(north < r.minLat || south > r.maxLat || east < r.minLng || west > r.maxLng)
   );
 
-  if (!matchingCols.length) return [];
-
   const bbox = `${west.toFixed(4)},${south.toFixed(4)},${east.toFixed(4)},${north.toFixed(4)}`;
 
-  // Zapytaj pasujące RDLP równolegle (zwykle 1 lub 2)
-  const fetches = matchingCols.map(col => {
-    const url = `${BDL_OGC_BASE}/${col.id}/items?f=json&bbox=${bbox}&limit=100`;
-    return fetchWithTimeout(url, {}, 4500)
-      .then(r => r.ok ? r.json() : { features: [] })
-      .catch(() => ({ features: [] }));
-  });
+  let allFeatures = [];
+  if (matchingCols.length > 0) {
+    // Zapytaj pasujące RDLP równolegle — pobierz do 1500 wydzieleń (pełne pokrycie kafelka 10x10 km)
+    const fetches = matchingCols.map(col => {
+      const url = `${BDL_OGC_BASE}/${col.id}/items?f=json&bbox=${bbox}&limit=1500`;
+      return fetchWithTimeout(url, {}, 5000)
+        .then(r => r.ok ? r.json() : { features: [] })
+        .catch(() => ({ features: [] }));
+    });
 
-  const results = await Promise.all(fetches);
-  const allFeatures = results.flatMap(r => r.features || []);
+    const results = await Promise.all(fetches);
+    allFeatures = results.flatMap(r => r.features || []);
+  }
+
+  // Jeśli BDL nie zwróciło wydzieleń (np. Park Narodowy lub las prywatny), pobierz obrysy leśne z OSM
+  if (allFeatures.length < 5) {
+    const osmRings = await fetchOsmForestRings(south, west, north, east);
+    if (osmRings.length > 0) {
+      return osmRings;
+    }
+  }
 
   return extractPolygonRings(allFeatures);
+}
+
+/**
+ * Fallback dla Parków Narodowych i lasów prywatnych spoza ewidencji BDL LP
+ */
+async function fetchOsmForestRings(south, west, north, east) {
+  const query = `
+    [out:json][timeout:5];
+    (
+      way["natural"="wood"](${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)});
+      way["landuse"="forest"](${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)});
+    );
+    out geom;
+  `;
+  try {
+    const res = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Grzybomapa/2.0'
+      }
+    }, 4500);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const rings = [];
+    for (const el of data.elements || []) {
+      if (!el.geometry || el.geometry.length < 3) continue;
+      const ring = el.geometry.map(pt => [pt.lon, pt.lat]);
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const [x, y] of ring) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+      rings.push({
+        ring,
+        minX, maxX, minY, maxY,
+        stand: { standScore: 0.75, specDesc: el.tags?.name || 'Las (OSM)' },
+        properties: el.tags || {},
+      });
+    }
+    return rings;
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -304,7 +360,7 @@ function extractPolygonRings(features) {
     const geom = f.geometry;
     if (!geom) continue;
 
-    const stand = scoreStand(f.properties);
+    const stand = scoreStand(f.properties) || { standScore: 0.70 };
 
     const rings = [];
     if (geom.type === 'Polygon') {
@@ -422,7 +478,7 @@ function renderGridToCanvas(gridSrc, nSrc, width, height, bounds, forestRings, w
     for (let c = 0; c < MASK_N; c++) {
       const lng = west + (east - west) * (c / (MASK_N - 1));
       const hit = findStandAt(lng, lat, forestRings);
-      forestMask[r][c] = hit ? (hit.stand?.standScore ?? 0.70) : 0.0;
+      forestMask[r][c] = hit ? Math.max(0.40, hit.stand?.standScore ?? 0.70) : 0.0;
     }
   }
 
@@ -445,8 +501,8 @@ function renderGridToCanvas(gridSrc, nSrc, width, height, bounds, forestRings, w
                       (1 - mrf) * mcf * fm01 +
                       mrf * mcf * fm11;
 
-      // Poza lasem — piksel jest całkowicie przezroczysty!
-      if (fFactor < 0.04) {
+      // Poza lasem — piksel jest w 100% przezroczysty!
+      if (fFactor < 0.03) {
         const idx = (y * width + x) * 4;
         data[idx + 3] = 0;
         continue;
@@ -463,9 +519,9 @@ function renderGridToCanvas(gridSrc, nSrc, width, height, bounds, forestRings, w
                         (1 - rf) * cf * v01 +
                         rf * cf * v11;
 
-      // Realistyczna wartość termiczna: Drzewostan BDL (50%) + Pogoda (35%) + Rzeźba (15%) × Sezon
-      const standVal = clamp(fFactor, 0.05, 1.0);
-      const val = (0.50 * standVal + 0.35 * weatherS + 0.15 * reliefVal) * seasonS;
+      // Realistyczna wartość termiczna: Drzewostan BDL/OSM (45%) + Pogoda (40%) + Rzeźba (15%) × Sezon
+      const standVal = clamp(fFactor, 0.20, 1.0);
+      const val = (0.45 * standVal + 0.40 * weatherS + 0.15 * reliefVal) * seasonS;
 
       const color = getColorForVal(val);
       const idx = (y * width + x) * 4;
@@ -474,7 +530,8 @@ function renderGridToCanvas(gridSrc, nSrc, width, height, bounds, forestRings, w
       data[idx + 1] = color.g;
       data[idx + 2] = color.b;
       // Łagodne wygaszanie przezroczystości na zewnętrznych obrysach lasu
-      data[idx + 3] = Math.round(color.a * Math.min(1.0, fFactor > 0.08 ? 1.0 : fFactor * 12));
+      const alphaFactor = fFactor > 0.15 ? 1.0 : fFactor / 0.15;
+      data[idx + 3] = Math.round(color.a * alphaFactor);
     }
   }
 

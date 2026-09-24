@@ -58,12 +58,20 @@ export async function getForestData(lat, lng) {
     console.warn('[ForestAPI] Overpass error:', e.message);
   }
 
-  // 3. Poza lasem państwowym i brak obiektu leśnego w OSM: teren niezalesiony (łąka / pole)
+  // 3. Fallback: Nominatim reverse geocode (niezawodna detekcja miast i wsi)
+  try {
+    const nomData = await fetchFromNominatim(lat, lng);
+    if (nomData) return nomData;
+  } catch (e) {
+    console.warn('[ForestAPI] Nominatim error:', e.message);
+  }
+
+  // 4. Poza lasem państwowym i brak obiektu leśnego w OSM: teren otwarty (łąka / pole)
   return {
     source: 'NON_FOREST',
     isForest: false,
     terrainType: 'meadow',
-    forestName: 'Teren niezalesiony (łąka / pole)',
+    forestName: 'Teren otwarty (łąka / pole uprawne)',
     nadlesnictwo: null,
     rdlp: null,
     speciesCodes: [],
@@ -381,151 +389,238 @@ function formatRDLPName(collectionId) {
 
 // ── Overpass API (fallback dla lasów niepaństwowych i klasyfikacja terenu) ───
 
+// ── Overpass API & Nominatim (detekcja lasów niepaństwowych, miast i terenu) ───
+
 async function fetchFromOverpass(lat, lng) {
-  // Wąski promień wokół punktu — sprawdza rzeczywisty teren pod pinezką
+  // Sprawdza lasy prywatne, akweny oraz tereny miejskie/wiejskie wokół punktu
   const query = `
-    [out:json][timeout:3];
+    [out:json][timeout:4];
     (
-      way["natural"="wood"](around:50,${lat},${lng});
-      way["landuse"="forest"](around:50,${lat},${lng});
-      way["natural"="water"](around:40,${lat},${lng});
-      way["waterway"](around:30,${lat},${lng});
-      way["building"](around:30,${lat},${lng});
-      way["landuse"="residential"](around:35,${lat},${lng});
-      way["landuse"="meadow"](around:50,${lat},${lng});
-      way["landuse"="farmland"](around:50,${lat},${lng});
-      relation["natural"="wood"](around:50,${lat},${lng});
-      relation["landuse"="forest"](around:50,${lat},${lng});
+      way["natural"="wood"](around:75,${lat},${lng});
+      way["landuse"="forest"](around:75,${lat},${lng});
+      relation["natural"="wood"](around:75,${lat},${lng});
+      relation["landuse"="forest"](around:75,${lat},${lng});
+      way["natural"="water"](around:50,${lat},${lng});
+      way["waterway"](around:35,${lat},${lng});
+      way["building"](around:100,${lat},${lng});
+      way["landuse"~"residential|commercial|industrial|retail|construction|cemetery|garages"](around:120,${lat},${lng});
+      way["highway"~"primary|secondary|tertiary|residential|service|pedestrian|living_street"](around:70,${lat},${lng});
+      way["landuse"~"meadow|farmland|orchard|allotments"](around:100,${lat},${lng});
+      way["natural"~"grassland|heath|scrub"](around:80,${lat},${lng});
     );
     out tags;
   `;
 
-  const res = await fetch(OVERPASS_BASE, {
-    method: 'POST',
-    body: `data=${encodeURIComponent(query)}`,
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Grzybomapa/2.0 (https://bartnik-hue.github.io/Grzybomapa)'
-    },
-    signal: AbortSignal.timeout(2500),
-  });
+  try {
+    const res = await fetch(OVERPASS_BASE, {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Grzybomapa/2.0 (https://bartnik-hue.github.io/Grzybomapa)'
+      },
+      signal: AbortSignal.timeout(3500),
+    });
 
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (!data.elements?.length) return null;
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.elements?.length) return null;
 
-  const elements = data.elements;
+    const elements = data.elements;
 
-  // 1. Sprawdź czy to las / zadrzewienie
-  const forestEl = elements.find(el => {
-    const t = el.tags || {};
-    return t.natural === 'wood' || t.landuse === 'forest';
-  });
+    // 1. Sprawdź czy to las / zadrzewienie
+    const forestEl = elements.find(el => {
+      const t = el.tags || {};
+      return t.natural === 'wood' || t.landuse === 'forest';
+    });
 
-  if (forestEl) {
-    const tags = forestEl.tags || {};
-    const leafType = tags.leaf_type;
-    const name = tags.name || tags['name:pl'] || 'Las prywatny / komunalny';
+    if (forestEl) {
+      const tags = forestEl.tags || {};
+      const leafType = tags.leaf_type;
+      const name = tags.name || tags['name:pl'] || 'Las prywatny / komunalny';
 
-    let speciesCodes = [];
-    if      (leafType === 'needleleaved') speciesCodes = ['So'];
-    else if (leafType === 'broadleaved')  speciesCodes = ['Db'];
-    else if (leafType === 'mixed')        speciesCodes = ['So', 'Db'];
-    else                                  speciesCodes = ['So'];
+      let speciesCodes = [];
+      if      (leafType === 'needleleaved') speciesCodes = ['So'];
+      else if (leafType === 'broadleaved')  speciesCodes = ['Db'];
+      else if (leafType === 'mixed')        speciesCodes = ['So', 'Db'];
+      else                                  speciesCodes = ['So'];
 
-    return {
-      source: 'OSM_Overpass',
-      isForest: true,
-      terrainType: 'forest',
-      forestName: name,
-      nadlesnictwo: null,
-      rdlp: null,
-      speciesCodes,
-      habitatCode: null,
-      area: null,
-      rawCode: leafType || 'unknown',
-      specAge: null,
-      adrFor: null,
-      _feature: null,
-    };
-  }
+      return {
+        source: 'OSM_Overpass',
+        isForest: true,
+        terrainType: 'forest',
+        forestName: name,
+        nadlesnictwo: null,
+        rdlp: null,
+        speciesCodes,
+        habitatCode: null,
+        area: null,
+        rawCode: leafType || 'unknown',
+        specAge: null,
+        adrFor: null,
+        _feature: null,
+      };
+    }
 
-  // 2. Sprawdź czy to zbiornik wodny
-  const waterEl = elements.find(el => {
-    const t = el.tags || {};
-    return t.natural === 'water' || t.waterway;
-  });
-  if (waterEl) {
-    return {
-      source: 'OSM_Overpass',
-      isForest: false,
-      terrainType: 'water',
-      forestName: waterEl.tags?.name || 'Akwen / Zbiornik wodny',
-      nadlesnictwo: null,
-      rdlp: null,
-      speciesCodes: [],
-      habitatCode: null,
-      area: null,
-      rawCode: null,
-      specAge: null,
-      adrFor: null,
-      _feature: null,
-    };
-  }
+    // 2. Sprawdź czy to zbiornik wodny
+    const waterEl = elements.find(el => {
+      const t = el.tags || {};
+      return t.natural === 'water' || t.waterway;
+    });
+    if (waterEl) {
+      return {
+        source: 'OSM_Overpass',
+        isForest: false,
+        terrainType: 'water',
+        forestName: waterEl.tags?.name || 'Akwen / Zbiornik wodny',
+        nadlesnictwo: null,
+        rdlp: null,
+        speciesCodes: [],
+        habitatCode: null,
+        area: null,
+        rawCode: null,
+        specAge: null,
+        adrFor: null,
+        _feature: null,
+      };
+    }
 
-  // 3. Sprawdź czy to łąka, pole uprawne, pastwisko
-  const meadowEl = elements.find(el => {
-    const t = el.tags || {};
-    return ['meadow', 'grass', 'farmland', 'orchard', 'allotments', 'village_green', 'recreation_ground'].includes(t.landuse) ||
-           ['grassland', 'heath', 'scrub'].includes(t.natural);
-  });
-  if (meadowEl) {
-    const t = meadowEl.tags || {};
-    const label = t.landuse === 'farmland'
-      ? 'Pole uprawne'
-      : (t.landuse === 'orchard' ? 'Sad' : 'Teren otwarty (łąka / pastwisko)');
-    return {
-      source: 'OSM_Overpass',
-      isForest: false,
-      terrainType: 'meadow',
-      forestName: t.name || label,
-      nadlesnictwo: null,
-      rdlp: null,
-      speciesCodes: [],
-      habitatCode: null,
-      area: null,
-      rawCode: null,
-      specAge: null,
-      adrFor: null,
-      _feature: null,
-    };
-  }
+    // 3. Sprawdź czy to teren zabudowany / miejski / wieś zabudowana
+    const urbanEl = elements.find(el => {
+      const t = el.tags || {};
+      return ['residential', 'commercial', 'industrial', 'retail', 'construction', 'cemetery', 'garages'].includes(t.landuse) ||
+             t.building ||
+             ['primary', 'secondary', 'tertiary', 'residential', 'service', 'pedestrian', 'living_street'].includes(t.highway);
+    });
+    if (urbanEl) {
+      const t = urbanEl.tags || {};
+      const label = t.name ? `Teren miejski / zabudowany (${t.name})` : 'Teren miejski / zabudowany';
+      return {
+        source: 'OSM_Overpass',
+        isForest: false,
+        terrainType: 'urban',
+        forestName: label,
+        nadlesnictwo: null,
+        rdlp: null,
+        speciesCodes: [],
+        habitatCode: null,
+        area: null,
+        rawCode: null,
+        specAge: null,
+        adrFor: null,
+        _feature: null,
+      };
+    }
 
-  // 4. Sprawdź czy to teren zabudowany / miejski
-  const urbanEl = elements.find(el => {
-    const t = el.tags || {};
-    return ['residential', 'commercial', 'industrial', 'retail', 'construction', 'cemetery'].includes(t.landuse) ||
-           t.building || t.highway;
-  });
-  if (urbanEl) {
-    return {
-      source: 'OSM_Overpass',
-      isForest: false,
-      terrainType: 'urban',
-      forestName: urbanEl.tags?.name || 'Obszar zurbanizowany (zabudowa / drogi)',
-      nadlesnictwo: null,
-      rdlp: null,
-      speciesCodes: [],
-      habitatCode: null,
-      area: null,
-      rawCode: null,
-      specAge: null,
-      adrFor: null,
-      _feature: null,
-    };
+    // 4. Sprawdź czy to łąka, pole uprawne, pastwisko
+    const meadowEl = elements.find(el => {
+      const t = el.tags || {};
+      return ['meadow', 'grass', 'farmland', 'orchard', 'allotments', 'village_green', 'recreation_ground'].includes(t.landuse) ||
+             ['grassland', 'heath', 'scrub'].includes(t.natural);
+    });
+    if (meadowEl) {
+      const t = meadowEl.tags || {};
+      const label = t.landuse === 'farmland'
+        ? 'Pole uprawne'
+        : (t.landuse === 'orchard' ? 'Sad' : 'Teren otwarty (łąka / pastwisko)');
+      return {
+        source: 'OSM_Overpass',
+        isForest: false,
+        terrainType: 'meadow',
+        forestName: t.name || label,
+        nadlesnictwo: null,
+        rdlp: null,
+        speciesCodes: [],
+        habitatCode: null,
+        area: null,
+        rawCode: null,
+        specAge: null,
+        adrFor: null,
+        _feature: null,
+      };
+    }
+  } catch {
+    return null;
   }
 
   return null;
+}
+
+/**
+ * Niezawodny fallback Nominatim — precyzyjnie rozpoznaje miasta, miasteczka, wsie oraz pola
+ */
+async function fetchFromNominatim(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Grzybomapa/2.0 (kontakt@grzybomapa.pl)' },
+    signal: AbortSignal.timeout(3500)
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const a = data.address || {};
+
+  // Miasto lub miasteczko
+  const cityName = a.city || a.town || (a.municipality?.toLowerCase().includes('miasto') ? a.municipality : null);
+  if (cityName) {
+    return {
+      source: 'OSM_Nominatim',
+      isForest: false,
+      terrainType: 'urban',
+      forestName: `Teren miejski (${cityName})`,
+      nadlesnictwo: null,
+      rdlp: null,
+      speciesCodes: [],
+      habitatCode: null,
+      area: null,
+      rawCode: null,
+      specAge: null,
+      adrFor: null,
+      _feature: null,
+    };
+  }
+
+  // Sprawdź czy to zabudowa wiejska (wieś / osada z numerem domu, budynkiem lub ulicą osiedlową)
+  const villageName = a.village || a.hamlet;
+  const isVillageSettlement = !!villageName && (
+    !!a.house_number ||
+    data.type === 'residential' ||
+    ['house', 'building', 'residential'].includes(data.addresstype) ||
+    ['building', 'amenity', 'shop', 'office'].includes(data.class)
+  );
+
+  if (isVillageSettlement) {
+    return {
+      source: 'OSM_Nominatim',
+      isForest: false,
+      terrainType: 'urban',
+      forestName: `Teren zabudowany (wieś ${villageName})`,
+      nadlesnictwo: null,
+      rdlp: null,
+      speciesCodes: [],
+      habitatCode: null,
+      area: null,
+      rawCode: null,
+      specAge: null,
+      adrFor: null,
+      _feature: null,
+    };
+  }
+
+  return {
+    source: 'OSM_Nominatim',
+    isForest: false,
+    terrainType: 'meadow',
+    forestName: villageName ? `Teren otwarty (łąka / pole — okolice ${villageName})` : 'Teren otwarty (łąka / pole uprawne)',
+    nadlesnictwo: null,
+    rdlp: null,
+    speciesCodes: [],
+    habitatCode: null,
+    area: null,
+    rawCode: null,
+    specAge: null,
+    adrFor: null,
+    _feature: null,
+  };
 }
 
 // ── Pomocnicze (dla nadleśnictwa) ──────────────────────────────────

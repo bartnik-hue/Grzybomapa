@@ -403,9 +403,9 @@ function renderForestInfo() {
 
     if (f.terrainType === 'urban') {
       terrainIcon = '🏙️';
-      terrainName = 'Teren zurbanizowany / Zabudowa';
+      terrainName = 'Teren miejski / zabudowany';
       terrainBadgeCls = 'badge-urban';
-      terrainDesc = 'Gęsta zabudowa, drogi lub infrastruktura miejska. Brak naturalnego podłoża i warunków do występowania grzybów jadalnych.';
+      terrainDesc = 'Obszar zurbanizowany (miasto / wieś zabudowana) — wyłączony ze zbiorów leśnych. Brak naturalnej ściółki i leśnych partnerów mikoryzowych. Na miejskich skwerach rzadko rosną pieczarki miejskie czy czernidłaki, lecz ich zbiór w miastach jest odradzany ze względu na zanieczyszczenia i metale ciężkie.';
     } else if (f.terrainType === 'water') {
       terrainIcon = '💧';
       terrainName = 'Zbiornik / Ciek wodny';
@@ -420,8 +420,10 @@ function renderForestInfo() {
           <h2 class="forest-name">${f.forestName || terrainName}</h2>
           <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
             ${modeBadge}
-            <span class="badge badge-nonforest">Teren niezalesiony</span>
             <span class="badge ${terrainBadgeCls}">${terrainName}</span>
+            <span class="badge badge-nonforest" style="${f.terrainType === 'urban' ? 'background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.3)' : ''}">
+              ${f.terrainType === 'urban' ? 'Wyłączony ze zbiorów' : 'Teren niezalesiony'}
+            </span>
           </div>
         </div>
       </div>
@@ -701,10 +703,33 @@ function renderMushrooms() {
   const isNonForest = f && f.isForest === false;
 
   if (isNonForest && (f.terrainType === 'urban' || f.terrainType === 'water')) {
+    if (f.terrainType === 'urban') {
+      el.innerHTML = `
+        <div class="empty-list" style="text-align:left;padding:16px 18px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.22);border-radius:12px;margin:8px 0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="font-size:26px">🏙️</span>
+            <div>
+              <strong style="color:#ef4444;font-size:14px;display:block">Teren miejski / zabudowany — wyłączony z programu</strong>
+              <small style="color:#94a3b8">Brak szans na jadalne grzyby leśne</small>
+            </div>
+          </div>
+          <p style="font-size:13px;color:#cbd5e1;line-height:1.5;margin:8px 0">
+            W zwartej zabudowie miast i wsi leśne grzyby jadalne (borowiki, podgrzybki, maślaki, kurki) nie występują z powodu braku leśnej mikoryzy i utwardzonego podłoża.
+          </p>
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:12px;color:#94a3b8;line-height:1.4">
+            ⚠️ <strong>Ostrzeżenie:</strong> Na miejskich trawnikach lub skwerach sporadycznie wyrastają pieczarki miejskie (<em>Agaricus bitorquis</em>) czy czernidłaki kołpakowate. Zbieranie i spożywanie grzybów w miastach i przy drogach jest <strong>zdecydowanie odradzane</strong> ze względu na wysoką bioakumulację metali ciężkich (ołów, kadm) oraz pyłów komunikacyjnych.
+          </div>
+          <p style="font-size:12px;color:#60a5fa;margin-top:8px">
+            👉 Przesuń próbnik lub kliknij na zielony las na mapie, aby sprawdzić szanse na zbiory.
+          </p>
+        </div>`;
+      return;
+    }
+
     el.innerHTML = `
       <div class="empty-list">
-        <span style="font-size:32px;display:block;margin-bottom:8px">${f.terrainType === 'urban' ? '🏙️' : '💧'}</span>
-        <p>Brak grzybów na terenie ${f.terrainType === 'urban' ? 'zurbanizowanym / miejskim' : 'wodnym'}.<br>
+        <span style="font-size:32px;display:block;margin-bottom:8px">💧</span>
+        <p>Brak grzybów na terenie wodnym.<br>
         <small>Wybierz las lub łąkę, aby sprawdzić występowanie grzybów.</small></p>
       </div>`;
     return;

@@ -305,31 +305,31 @@ export function scoreStand(props) {
   const site = (props.site_type || props.habitatCode || '').toUpperCase().trim();
 
   // 1. Wiek drzewostanu (klucz do wytworzenia mikoryzy z grzybami)
-  let ageScore = 0.5;
-  let ageDesc = '';
-  let ageImpact = '+0%';
-  if (age <= 4) {
-    ageScore = 0.05;
+  let ageScore = 0.75;
+  let ageDesc = 'Drzewostan dojrzały';
+  let ageImpact = '+20%';
+  if (age > 0 && age <= 4) {
+    ageScore = 0.15;
     ageDesc = `Uprawa (${age} l.) — brak rozwiniętej mikoryzy podgrzybków i borowików`;
     ageImpact = '-40%';
-  } else if (age <= 15) {
-    ageScore = 0.72;
+  } else if (age > 4 && age <= 15) {
+    ageScore = 0.75;
     ageDesc = `Młodnik (${age} l.) — wysyp maślaków, rydzów i purchawek`;
     ageImpact = '+20%';
-  } else if (age <= 35) {
-    ageScore = 0.65;
+  } else if (age > 15 && age <= 35) {
+    ageScore = 0.70;
     ageDesc = `Drzewostan młody (${age} l.) — umiarkowane owocowanie`;
     ageImpact = '+15%';
-  } else if (age <= 70) {
-    ageScore = 0.88;
+  } else if (age > 35 && age <= 70) {
+    ageScore = 0.90;
     ageDesc = `Drzewostan dojrzewający (${age} l.) — bogata mikoryza podgrzybkowa i kurkowa`;
     ageImpact = '+30%';
-  } else if (age <= 130) {
+  } else if (age > 70 && age <= 130) {
     ageScore = 0.98;
     ageDesc = `Starodrzew (${age} l.) — optymalne siedlisko borowika szlachetnego i podgrzybka`;
     ageImpact = '+35%';
-  } else {
-    ageScore = 0.82;
+  } else if (age > 130) {
+    ageScore = 0.85;
     ageDesc = `Starodrzew sędziwy (${age} l.) — dojrzały ekosystem leśny`;
     ageImpact = '+25%';
   }
@@ -386,7 +386,7 @@ export function scoreStand(props) {
     siteImpact = '-25%';
   }
 
-  const standScore = age <= 4 ? 0.08 : (0.50 * ageScore + 0.30 * specScore + 0.20 * siteScore);
+  const standScore = (age > 0 && age <= 4) ? 0.20 : (0.50 * ageScore + 0.30 * specScore + 0.20 * siteScore);
   return {
     standScore,
     age,
@@ -493,9 +493,9 @@ export function generateDetailedDiagnosis(overallScore, weatherAnalysis, forestD
       type: 'bad',
       icon: isUrban ? '🏙️' : (isWater ? '🌊' : '🌾'),
       title: 'Pokrycie terenu',
-      val: forestData.forestName || 'Teren niezalesiony',
+      val: forestData.forestName || (isUrban ? 'Teren miejski / zabudowany' : 'Teren otwarty'),
       desc: isUrban
-        ? 'Obszar zurbanizowany / drogi — brak warunków do owocowania grzybów.'
+        ? 'Obszar zurbanizowany / wieś zabudowana (wyłączony ze zbiorów). Brak leśnej mikoryzy, gleba utwardzona. Sporadycznie w parkach miejskich lub na skwerach rosną pieczarki miejskie lub czernidłaki, lecz zbieranie grzybów w miastach i przy drogach jest niebezpieczne ze względu na kumulację metali ciężkich (ołów, kadm).'
         : (isWater ? 'Akwen wodny — grzyby nie występują w wodzie.' : 'Brak drzewostanu wyklucza mikoryzę leśną (brak borowików, kurek, rydzów). Możliwe wyłącznie nieliczne grzyby łąkowe.'),
       impact: isUrban || isWater ? '-100%' : '-75%',
     });
@@ -552,8 +552,8 @@ export function generateSummary(overallScore, weatherAnalysis, forestName, fores
   if (forestData && forestData.isForest === false) {
     if (forestData.terrainType === 'urban') {
       return {
-        main: 'Wskazano obszar zurbanizowany (zabudowa, drogi lub infrastruktura miejska).',
-        tip: 'Grzyby nie występują w terenie miejskim. Aby sprawdzić szanse na zbiory, wskaż na mapie pobliski las.'
+        main: `Wskazano ${forestData.forestName || 'obszar miejski / zabudowany'}. Teren wyłączony z grzybobrania — brak szans na jadalne grzyby leśne.`,
+        tip: 'Zabudowa i asfalt uniemożliwiają rozwój leśnej mikoryzy. Choć w parkach i na trawnikach miejskich rzadko trafiają się pieczarki miejskie lub czernidłaki, zbieranie grzybów w miastach jest niebezpieczne ze względu na kumulację metali ciężkich i spalin. Wskaż na mapie pobliski las!'
       };
     }
     if (forestData.terrainType === 'water') {
