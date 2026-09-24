@@ -212,8 +212,6 @@ export function initMap(containerId = 'map') {
     maxZoom: 19,
   }).addTo(map);
 
-  // Warstwa WMS — Drzewostany LP (nakładka z typem drzewostanu)
-  addForestWMSLayer();
 
   // Odśwież nakładkę typów lasu po zakończeniu przesuwania/zoomowania
   map.on('moveend', () => {

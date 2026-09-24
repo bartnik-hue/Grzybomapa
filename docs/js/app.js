@@ -54,7 +54,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lng = state.pinMode ? state.pinLng : state.lng;
     loadAllData(lat, lng);
   });
-  $('btn-layer-toggle').addEventListener('click', onLayerToggle);
   $('btn-heatmap').addEventListener('click', onHeatmapToggle);
   $('btn-tree-species').addEventListener('click', onTreeSpeciesToggle);
   $('btn-trails').addEventListener('click', onTrailsToggle);
@@ -924,12 +923,6 @@ function getGpsError(e) {
   return 'Błąd GPS: ' + (e.message || 'nieznany');
 }
 
-let forestLayerVisible = true;
-function onLayerToggle() {
-  forestLayerVisible = !forestLayerVisible;
-  $('btn-layer-toggle').classList.toggle('active', forestLayerVisible);
-  if (window.toggleForestLayerGlobal) window.toggleForestLayerGlobal(forestLayerVisible);
-}
 
 function onHeatmapToggle() {
   const nowVisible = !isHeatmapVisible();
