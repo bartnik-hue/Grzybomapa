@@ -595,6 +595,19 @@ export function generateSummary(overallScore, weatherAnalysis, forestName, fores
     tip = `🏜️ Długo bez deszczu. Szukaj w obniżeniach terenu, przy rowach i ciekach wodnych.`;
   }
 
+  if (forestData?.missingLpData || forestData?.isApproximate) {
+    if (overallScore >= 50) {
+      main = `Korzystne warunki pogodowe${name}. Brak urzędowych danych Lasów Państwowych — warunki obliczone przypuszczalnie na bazie wilgotności i temperatur.`;
+    } else {
+      main = `Warunki umiarkowane lub osłabione${name}. Wycena przypuszczalna na podstawie lokalnej pogody i wilgotności podłoża.`;
+    }
+
+    const approxNote = forestData.isNationalPark
+      ? ' (Uwaga: Park Narodowy — zbiór runa leśnego może być ustawowo zabroniony).'
+      : ' (Brak danych o tym lesie w BDL — przypuszczalnie występują tu borowiki, podgrzybki, kurki, koźlarze i maślaki).';
+    tip = tip ? `${tip}${approxNote}` : `🌲 Las z bazy OpenStreetMap${approxNote}`;
+  }
+
   return { main, tip };
 }
 

@@ -10,7 +10,7 @@ import { getWeatherData, weatherCodeToText, weatherCodeToIcon } from './weather.
 import { getMushroomsForStand, getMushroomsForMixedForest, filterBySeason, TREE_SPECIES } from './mushroom_knowledge.js';
 import { scoreAllMushrooms, calculateOverallScore, calculateDailyForecastScores, generateSummary, generateDetailedDiagnosis, edibleLabel, scoreToColor, scoreToLabel } from './scoring.js';
 import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleTreeSpeciesLayer, toggleTrailsLayer, isTrailsVisible } from './map.js';
-import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=5.0';
+import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=8.0';
 
 // ── Stan aplikacji ─────────────────────────────────────────────────
 const state = {
@@ -328,9 +328,10 @@ const LP_TO_NORM = {
  * "SO"        → [{code:'So',pct:100}]
  */
 function parseCompositionForScoring(rawCode, speciesCodes) {
-  if (!rawCode) {
-    const n = speciesCodes?.length || 1;
-    return (speciesCodes || []).map(c => ({ code: c, pct: Math.round(100 / n) }));
+  if (!rawCode || ['mixed', 'needleleaved', 'broadleaved'].includes(rawCode.toLowerCase())) {
+    const codes = (speciesCodes && speciesCodes.length) ? speciesCodes : ['So', 'Db'];
+    const eqPct = Math.round(100 / codes.length);
+    return codes.map(c => ({ code: c, pct: eqPct }));
   }
 
   const upper = rawCode.toUpperCase().trim();
@@ -432,11 +433,14 @@ function renderForestInfo() {
     return;
   }
 
-  const sourceBadge = (f.source === 'OGC_LP' || f.source === 'LP_WFS')
-    ? '<span class="badge badge-lp">Lasy Państwowe</span>'
-    : '<span class="badge badge-osm">OpenStreetMap</span>';
+  const isApprox = f.isApproximate || f.source?.startsWith('OSM') || f.missingLpData;
 
-  const rdlpLabel = f.rdlp || f.nadlesnictwo || '';
+  const sourceBadge = (f.source === 'OGC_LP' || f.source === 'LP_WFS')
+    ? '<span class="badge badge-lp">Lasy Państwowe (BDL)</span>'
+    : `<span class="badge badge-osm">OpenStreetMap</span>
+       <span class="badge badge-warning" style="background:rgba(234,179,8,0.18);color:#fef08a;border:1px solid rgba(234,179,8,0.4)">⚠️ Brak danych LP (dane szacunkowe)</span>`;
+
+  const rdlpLabel = f.rdlp || f.nadlesnictwo || (f.isNationalPark ? 'Park Narodowy (Ochrona przyrody)' : (isApprox ? 'Zasoby leśne OSM' : ''));
 
   // Rozszyfrowuj skład gatunkowy
   const composition = decodeComposition(f.rawCode);
@@ -447,27 +451,42 @@ function renderForestInfo() {
           <span class="species-bar-wrap"><span class="species-bar" style="width:${s.pct ?? 100}%"></span></span>
           <span class="species-name"><strong>${s.name}</strong> <em>${s.latin}</em></span>
         </div>`).join('')
-    : `<p class="no-data" style="margin:0;font-size:12px">Brak danych o składzie</p>`;
+    : `<p class="no-data" style="margin:0;font-size:12px">Brak danych o szczegółowym składzie</p>`;
 
   // Czytelny opis siedliska
   const habitatLabel = f.habitatCode
     ? `${f.habitatCode} — ${decodeHabitat(f.habitatCode)}`
     : null;
 
+  const approxNotice = isApprox ? `
+    <div class="approx-notice-box" style="margin:10px 0;padding:11px 14px;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.35);border-radius:8px;font-size:12.5px;line-height:1.5;color:#fef08a">
+      🌲 <strong>Brak danych urzędowych na temat tego lasu:</strong><br>
+      ${f.isNationalPark
+        ? 'Teren leży w granicach Parku Narodowego (poza ewidencją Lasów Państwowych).'
+        : 'Teren stanowi las według mapy OpenStreetMap (las prywatny, komunalny lub zadrzewienie), lecz nie posiada ewidencji LP ani planu urządzania lasu.'}<br>
+      <span style="display:inline-block;margin-top:4px">
+        <strong>Przypuszczalnie występują tu gatunki grzybów:</strong><br>
+        Lokalne warunki i typowe zadrzewienie sprzyjają takim grzybom jak: <em>Borowik szlachetny, Podgrzybek brunatny, Pieprznik jadalny (Kurka), Koźlarz, Maślak oraz Czubajka kania</em>.
+        Indeks zbiorów obliczono przypuszczalnie na bazie wilgotności gleby, opadów i mikroklimatu.
+      </span>
+    </div>
+  ` : '';
+
   infoEl.innerHTML = `
     <div class="forest-header">
-      <span class="forest-icon-big">🌲</span>
+      <span class="forest-icon-big">${f.isNationalPark ? '🏞️' : '🌲'}</span>
       <div>
         <h2 class="forest-name">${f.forestName || 'Las Państwowy'}</h2>
-        ${rdlpLabel ? `<p class="forest-sub">RDLP ${rdlpLabel}</p>` : ''}
+        ${rdlpLabel ? `<p class="forest-sub">${rdlpLabel.startsWith('Park') || rdlpLabel.startsWith('Zasoby') ? rdlpLabel : 'RDLP ' + rdlpLabel}</p>` : ''}
         <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
           ${modeBadge}
           ${sourceBadge}
         </div>
       </div>
     </div>
+    ${approxNotice}
     <div class="composition-block">
-      <div class="composition-label">Skład drzewostanu</div>
+      <div class="composition-label">${isApprox ? 'Przypuszczalny skład drzewostanu' : 'Skład drzewostanu'}</div>
       ${compositionHtml}
     </div>
     <div class="forest-details">
@@ -475,6 +494,7 @@ function renderForestInfo() {
       ${f.specAge     ? `<div class="detail-chip">🌱 Wiek: <strong>${f.specAge}</strong></div>` : ''}
       ${f.area        ? `<div class="detail-chip">📐 ${f.area}</div>` : ''}
       ${f.adrFor      ? `<div class="detail-chip" title="Adres leśny">📌 ${f.adrFor.trim()}</div>` : ''}
+      ${isApprox && !f.specAge ? `<div class="detail-chip" title="Status ewidencji">ℹ️ Poza ewidencją Lasów Państwowych</div>` : ''}
     </div>
   `;
 }
@@ -487,6 +507,26 @@ function renderForestInfo() {
  */
 function decodeComposition(rawCode) {
   if (!rawCode) return [];
+
+  const lower = rawCode.toLowerCase().trim();
+  if (lower === 'needleleaved') {
+    return [
+      { pct: 70, code: 'So', name: 'Sosna (szac.)', latin: 'Pinus sylvestris' },
+      { pct: 30, code: 'Sw', name: 'Świerk (szac.)', latin: 'Picea abies' },
+    ];
+  }
+  if (lower === 'broadleaved') {
+    return [
+      { pct: 60, code: 'Db', name: 'Dąb (szac.)', latin: 'Quercus robur' },
+      { pct: 40, code: 'Brz', name: 'Brzoza (szac.)', latin: 'Betula pendula' },
+    ];
+  }
+  if (lower === 'mixed') {
+    return [
+      { pct: 60, code: 'So', name: 'Sosna (szac.)', latin: 'Pinus sylvestris' },
+      { pct: 40, code: 'Db', name: 'Dąb (szac.)', latin: 'Quercus robur' },
+    ];
+  }
 
   const upper = rawCode.toUpperCase().trim();
   const knownKeys = Object.keys(LP_TO_NORM).sort((a,b) => b.length - a.length);
