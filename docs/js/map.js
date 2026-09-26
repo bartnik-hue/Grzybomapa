@@ -210,6 +210,7 @@ export function initMap(containerId = 'map') {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
     maxZoom: 19,
+    crossOrigin: true,
   }).addTo(map);
 
 

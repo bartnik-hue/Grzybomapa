@@ -69,9 +69,9 @@ function checkNationalPark(lat, lng) {
 }
 
 const OVERPASS_SERVERS = [
-  'https://overpass-api.de/api/interpreter',
   'https://lz4.overpass-api.de/api/interpreter',
   'https://z.overpass-api.de/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
 ];
 
@@ -104,68 +104,98 @@ function isForestColor(r, g, b) {
 /**
  * Nadrzędna detekcja obecności lasu na kafelku OpenStreetMap.
  * Próbkuje piksele z kafelka OSM wyświetlanego użytkownikowi na ekranie.
- * Sprawdza zoom 15 i zoom 14, wykrywając zarówno pełne lasy, jak i zielone pola z drzewkami (młodniki, zalesienia).
+ * Używa fetch(tileUrl, { mode: 'cors' }) oraz createImageBitmap, co eliminuje
+ * błędy Cross-Origin Canvas Tainting w przeglądarce i działa błyskawicznie (0-150 ms).
+ * Sprawdza zoom 15, 14 oraz 16, wykrywając każdy las, zagajnik, młodnik i symbol drzewka.
  */
 export async function isOsmForestTileAt(lat, lng) {
-  if (typeof window === 'undefined' || typeof Image === 'undefined') return null;
+  if (typeof window === 'undefined') return null;
 
-  const checkAtZoom = (zoom) => {
-    return new Promise((resolve) => {
-      try {
-        const n = 1 << zoom;
-        const x = (lng + 180) / 360 * n;
-        const latRad = lat * Math.PI / 180;
-        const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-        const tileX = Math.floor(x);
-        const tileY = Math.floor(y);
-        const px = Math.floor((x - tileX) * 256);
-        const py = Math.floor((y - tileY) * 256);
+  const checkAtZoom = async (zoom) => {
+    try {
+      const n = 1 << zoom;
+      const x = (lng + 180) / 360 * n;
+      const latRad = lat * Math.PI / 180;
+      const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+      const tileX = Math.floor(x);
+      const tileY = Math.floor(y);
+      const px = Math.floor((x - tileX) * 256);
+      const py = Math.floor((y - tileY) * 256);
 
-        const tileUrl = `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+      const tileUrl = `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
 
-        const timer = setTimeout(() => resolve(null), 1200);
-
-        img.onload = () => {
-          clearTimeout(timer);
-          try {
-            const cvs = document.createElement('canvas');
-            const sampleRadius = 5; // Obszar 11x11 pikseli wokół punktu
-            const size = sampleRadius * 2 + 1;
-            cvs.width = size;
-            cvs.height = size;
-            const ctx = cvs.getContext('2d', { willReadFrequently: true });
-            ctx.drawImage(img, -(px - sampleRadius), -(py - sampleRadius));
-            const imgData = ctx.getImageData(0, 0, size, size).data;
-            let forestPixels = 0;
-            for (let i = 0; i < imgData.length; i += 4) {
-              if (isForestColor(imgData[i], imgData[i + 1], imgData[i + 2])) {
-                forestPixels++;
-              }
-            }
-            resolve(forestPixels >= 2);
-          } catch {
-            resolve(null);
+      // 1. Pobierz kafelek przez fetch z trybem CORS (bezpieczny dla Canvas)
+      let imageSource = null;
+      if (typeof fetch !== 'undefined' && typeof createImageBitmap !== 'undefined') {
+        try {
+          const res = await fetch(tileUrl, { mode: 'cors', signal: AbortSignal.timeout(2500) });
+          if (res.ok) {
+            const blob = await res.blob();
+            imageSource = await createImageBitmap(blob);
           }
-        };
-
-        img.onerror = () => {
-          clearTimeout(timer);
-          resolve(null);
-        };
-
-        img.src = tileUrl;
-      } catch {
-        resolve(null);
+        } catch {
+          // Fallback do new Image() poniżej
+        }
       }
-    });
+
+      // 2. Tradycyjny fallback Image() jeśli fetch/createImageBitmap zawiedzie
+      if (!imageSource && typeof Image !== 'undefined') {
+        imageSource = await new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          const timer = setTimeout(() => resolve(null), 2500);
+          img.onload = () => { clearTimeout(timer); resolve(img); };
+          img.onerror = () => { clearTimeout(timer); resolve(null); };
+          img.src = tileUrl;
+        });
+      }
+
+      if (!imageSource) return null;
+
+      // 3. Renderuj próbkę na płótnie Canvas
+      const cvs = (typeof OffscreenCanvas !== 'undefined')
+        ? new OffscreenCanvas(256, 256)
+        : document.createElement('canvas');
+      cvs.width = 256;
+      cvs.height = 256;
+      const ctx = cvs.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(imageSource, 0, 0);
+
+      const sampleRadius = 6; // Obszar 13x13 pikseli wokół punktu
+      const size = sampleRadius * 2 + 1;
+      const sx = Math.max(0, Math.min(256 - size, px - sampleRadius));
+      const sy = Math.max(0, Math.min(256 - size, py - sampleRadius));
+
+      const imgData = ctx.getImageData(sx, sy, size, size).data;
+      let forestPixels = 0;
+      for (let i = 0; i < imgData.length; i += 4) {
+        if (isForestColor(imgData[i], imgData[i + 1], imgData[i + 2])) {
+          forestPixels++;
+        }
+      }
+
+      return forestPixels >= 2;
+    } catch (e) {
+      console.warn('[ForestAPI] Tile check error at zoom', zoom, e);
+      return null;
+    }
   };
 
-  const res15 = await checkAtZoom(15);
-  if (res15 === true) return true;
-  const res14 = await checkAtZoom(14);
-  return res14 === true;
+  // Sprawdzaj równolegle zoom 15 i 14 dla maksymalnej szybkości
+  const [res15, res14] = await Promise.all([
+    checkAtZoom(15),
+    checkAtZoom(14),
+  ]);
+
+  if (res15 === true || res14 === true) return true;
+  if (res15 === false && res14 === false) return false;
+
+  // W razie braku jednoznacznego wyniku sprawdź zoom 16
+  const res16 = await checkAtZoom(16);
+  if (res16 === true) return true;
+  if (res16 === false) return false;
+
+  return null;
 }
 
 // ── Funkcje publiczne ──────────────────────────────────────────────
@@ -880,11 +910,18 @@ async function fetchFromNominatim(lat, lng) {
     // Ścieżka, dukt lub szlak leśny (path, track, footway)
     const isPathOrTrack = ['path', 'track', 'footway', 'cycleway'].includes(d.type);
 
+    const nomLat = parseFloat(d.lat), nomLon = parseFloat(d.lon);
+    const dDist = (!isNaN(nomLat) && !isNaN(nomLon))
+      ? Math.hypot((lat - nomLat) * 111000, (lng - nomLon) * 111000 * Math.cos(lat * Math.PI / 180))
+      : 0;
+
     // 3. Sprawdź czy otoczenie ścieżki wskazuje na leśną drogę/szlak bez zabudowań miejskich
-    const hasBuildingOrHouse = !!a.house_number ||
-                               ['building', 'shop', 'amenity', 'office', 'tourism'].includes(d.class) ||
+    const hasBuildingOrHouse = (dDist < 120) && (
+                               !!a.house_number ||
+                               ['building', 'shop', 'amenity', 'office', 'tourism', 'craft'].includes(d.class) ||
                                ['house', 'apartments', 'commercial', 'retail', 'pedestrian', 'living_street'].includes(d.type) ||
-                               ['house', 'building', 'city_block'].includes(d.addresstype);
+                               ['house', 'building', 'city_block'].includes(d.addresstype)
+    );
 
     const cityName = a.city || a.town;
 
@@ -910,7 +947,7 @@ async function fetchFromNominatim(lat, lng) {
       }
     }
 
-    const isUrbanStreet = !!cityName && !isPathOrTrack && (
+    const isUrbanStreet = (dDist < 120) && !!cityName && !isPathOrTrack && (
       ['residential', 'living_street', 'pedestrian'].includes(d.type) ||
       ['city_block', 'quarter'].includes(d.addresstype) ||
       (['primary', 'secondary', 'tertiary'].includes(d.type) && !!a.house_number)

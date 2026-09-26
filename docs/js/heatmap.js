@@ -570,12 +570,24 @@ function tileToLatLng(tileX, tileY, zoom) {
   return { lat, lng };
 }
 
-function loadOsmTileImage(tx, ty, zoom) {
+async function loadOsmTileImage(tx, ty, zoom) {
+  const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+  if (typeof fetch !== 'undefined' && typeof createImageBitmap !== 'undefined') {
+    try {
+      const res = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        const blob = await res.blob();
+        const img = await createImageBitmap(blob);
+        return { img, tx, ty };
+      }
+    } catch {}
+  }
+
   return new Promise((resolve) => {
     if (typeof Image === 'undefined') return resolve(null);
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    const timer = setTimeout(() => resolve(null), 1800);
+    const timer = setTimeout(() => resolve(null), 2500);
     img.onload = () => {
       clearTimeout(timer);
       resolve({ img, tx, ty });
@@ -584,7 +596,7 @@ function loadOsmTileImage(tx, ty, zoom) {
       clearTimeout(timer);
       resolve(null);
     };
-    img.src = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+    img.src = url;
   });
 }
 
