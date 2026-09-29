@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/style.css?v=5.3" />
+  <link rel="stylesheet" href="css/style.css?v=5.4" />
 </head>
 <body>
 
@@ -65,6 +65,12 @@
       <button id="btn-locate" class="icon-btn" title="Lokalizator GPS na żywo" aria-label="Lokalizuj mnie GPS">
         <span class="btn-icon">🎯</span>
         <span class="btn-label" data-i18n="btnGps">GPS</span>
+      </button>
+
+      <!-- Przycisk Instrukcja / Help Button -->
+      <button id="btn-help" class="icon-btn" title="Instrukcja obsługi" aria-label="Instrukcja obsługi">
+        <span class="btn-icon">❓</span>
+        <span class="btn-label" data-i18n="btnHelp">Instrukcja</span>
       </button>
 
       <!-- Przycisk wyboru języka / Language Button -->
@@ -163,6 +169,80 @@
     <button class="lang-opt" data-lang="lt"><span class="lang-flag">🇱🇹</span> Lietuvių</button>
   </div>
 
+  <!-- Modal Instrukcji / Pomocy (Przewodnik po GrzyboMapie) -->
+  <div id="modal-help" class="modal-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="modal-help-title">
+    <div class="modal-backdrop" id="modal-help-backdrop"></div>
+    <div class="modal-container">
+      <header class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">🍄</span>
+          <div>
+            <h2 id="modal-help-title" data-i18n="helpTitle">Przewodnik po GrzyboMapie</h2>
+            <p class="modal-subtitle" data-i18n="helpSubtitle">Jak szybko znaleźć najlepsze miejsca na grzyby?</p>
+          </div>
+        </div>
+        <button id="btn-close-help" class="modal-close-btn" aria-label="Zamknij instrukcję">✕</button>
+      </header>
+
+      <div class="modal-body">
+        <!-- Krok 1 -->
+        <div class="help-step">
+          <div class="help-step-icon">📌</div>
+          <div class="help-step-content">
+            <h3 data-i18n="helpStep1Title">1. Wskaż las na mapie</h3>
+            <p data-i18n="helpStep1Desc">Kliknij w dowolny kompleks leśny lub przeciągnij pinezkę Próbnika (📌), aby natychmiast zbadać szanse na grzyby i profil drzewostanu.</p>
+          </div>
+        </div>
+
+        <!-- Krok 2 -->
+        <div class="help-step">
+          <div class="help-step-icon">🎯</div>
+          <div class="help-step-content">
+            <h3 data-i18n="helpStep2Title">2. Jesteś w lesie? Włącz GPS</h3>
+            <p data-i18n="helpStep2Desc">Przycisk GPS ustala Twoją pozycję na żywo. Dowiesz się natychmiast, w jakim typie lasu stoisz i jakich gatunków szukać w pobliżu.</p>
+          </div>
+        </div>
+
+        <!-- Krok 3 -->
+        <div class="help-step">
+          <div class="help-step-icon">📊</div>
+          <div class="help-step-content">
+            <h3 data-i18n="helpStep3Title">3. Diagnoza pogody i gatunki</h3>
+            <p data-i18n="helpStep3Desc">W dolnym panelu sprawdzisz prognozę 7-dniową, wilgotność gleby, deszcz z 14 dni, fazy księżyca oraz listę pasujących grzybów.</p>
+          </div>
+        </div>
+
+        <!-- Krok 4 -->
+        <div class="help-step">
+          <div class="help-step-icon">🗺️</div>
+          <div class="help-step-content">
+            <h3 data-i18n="helpStep4Title">4. Warstwy leśne i ścieżki</h3>
+            <p data-i18n="helpStep4Desc">Przełączaj Szanse (🌡️) dla mapy cieplnej, Gatunki drzew (🌲) z Lasów Państwowych oraz Ścieżki (🥾) z duktami leśnymi i szlakami.</p>
+          </div>
+        </div>
+
+        <!-- Bezpieczeństwo -->
+        <div class="help-alert">
+          <div class="help-alert-icon">⚠️</div>
+          <div class="help-alert-text">
+            <strong data-i18n="helpSafetyTitle">Złota zasada grzybiarza:</strong>
+            <span data-i18n="helpSafetyDesc">GrzyboMapa szacuje warunki przyrodnicze. Zbieraj wyłącznie grzyby, które znasz na 100%! W razie wątpliwości nie ryzykuj.</span>
+          </div>
+        </div>
+      </div>
+
+      <footer class="modal-footer">
+        <label class="modal-dont-show">
+          <input type="checkbox" id="chk-dont-show-help" checked />
+          <span data-i18n="helpDontShowAgain">Nie pokazuj automatycznie przy kolejnej wizycie</span>
+        </label>
+        <button id="btn-ack-help" class="modal-action-btn">
+          <span data-i18n="helpGotItBtn">Ruszajmy w las! 🌲</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+
   <!-- ══ PANEL DOLNY ═══════════════════════════════════════════════ -->
   <aside id="bottom-panel" role="complementary" aria-label="Informacje o grzybobraniu">
 
@@ -256,7 +336,7 @@
 
 
 <!-- Główna aplikacja (ES modules) -->
-<script type="module" src="js/app.js?v=13.1"></script>
+<script type="module" src="js/app.js?v=13.2"></script>
 
 <!-- Service Worker Cache Purge & Register -->
 <script>

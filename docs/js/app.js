@@ -51,6 +51,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bindowanie przełącznika języków
   initLanguageSwitcher();
 
+  // Inicjalizacja modala instrukcji / przewodnika
+  initHelpModal();
+
   // Bindowania przycisków
   $('btn-locate').addEventListener('click', onLocateClick);
   $('btn-pin-mode').addEventListener('click', onPinModeClick);
@@ -147,6 +150,62 @@ function initLanguageSwitcher() {
   });
 }
 
+// ── Przewodnik / Instrukcja ──────────────────────────────────────────
+function initHelpModal() {
+  const modal = $('modal-help');
+  const btnHelp = $('btn-help');
+  const btnClose = $('btn-close-help');
+  const btnAck = $('btn-ack-help');
+  const backdrop = $('modal-help-backdrop');
+  const chkDontShow = $('chk-dont-show-help');
+  if (!modal) return;
+
+  const HELP_STORAGE_KEY = 'grzybomap_help_seen';
+
+  function openModal() {
+    modal.classList.remove('hidden');
+  }
+
+  function closeModal(savePreference = false) {
+    modal.classList.add('hidden');
+    if (savePreference || (chkDontShow && chkDontShow.checked)) {
+      try {
+        localStorage.setItem(HELP_STORAGE_KEY, 'true');
+      } catch {}
+    } else {
+      try {
+        localStorage.removeItem(HELP_STORAGE_KEY);
+      } catch {}
+    }
+  }
+
+  btnHelp?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openModal();
+  });
+
+  btnClose?.addEventListener('click', () => closeModal(false));
+  btnAck?.addEventListener('click', () => closeModal(true));
+  backdrop?.addEventListener('click', () => closeModal(false));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+      closeModal(false);
+    }
+  });
+
+  // Automatyczne wyświetlenie przy wejściu (jeśli użytkownik jeszcze nie widział lub nie wyłączył)
+  try {
+    const seen = localStorage.getItem(HELP_STORAGE_KEY);
+    if (!seen) {
+      // Wyświetl krótko po zniknięciu splash screena (splash znika po 1.8s)
+      setTimeout(() => {
+        openModal();
+      }, 2100);
+    }
+  } catch {}
+}
+
 function updateStaticTexts() {
   const lang = getLang();
   document.title = t('appTitle');
@@ -182,6 +241,11 @@ function updateStaticTexts() {
   if (bGps) {
     bGps.title = t('btnGpsTitle');
     bGps.setAttribute('aria-label', t('btnGpsTitle'));
+  }
+  const bHelp = $('btn-help');
+  if (bHelp) {
+    bHelp.title = t('btnHelpTitle');
+    bHelp.setAttribute('aria-label', t('btnHelpTitle'));
   }
   const bRefresh = $('btn-refresh');
   if (bRefresh) {
