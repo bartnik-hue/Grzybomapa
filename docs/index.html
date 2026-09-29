@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/style.css?v=5.2" />
+  <link rel="stylesheet" href="css/style.css?v=5.3" />
 </head>
 <body>
 
@@ -67,22 +67,11 @@
         <span class="btn-label" data-i18n="btnGps">GPS</span>
       </button>
 
-      <!-- Selektor języka / Language Selector -->
-      <div class="lang-selector-wrap" id="lang-selector-wrap">
-        <button id="btn-lang" class="icon-btn lang-btn" title="Język / Language" aria-label="Wybierz język">
-          <span class="btn-icon">🌐</span>
-          <span class="btn-label" id="current-lang-code">PL</span>
-        </button>
-        <div id="lang-dropdown" class="lang-dropdown hidden">
-          <button class="lang-opt" data-lang="pl"><span class="lang-flag">🇵🇱</span> Polski</button>
-          <button class="lang-opt" data-lang="en"><span class="lang-flag">🇬🇧</span> English</button>
-          <button class="lang-opt" data-lang="de"><span class="lang-flag">🇩🇪</span> Deutsch</button>
-          <button class="lang-opt" data-lang="uk"><span class="lang-flag">🇺🇦</span> Українська</button>
-          <button class="lang-opt" data-lang="sk"><span class="lang-flag">🇸🇰</span> Slovenčina</button>
-          <button class="lang-opt" data-lang="cs"><span class="lang-flag">🇨🇿</span> Čeština</button>
-          <button class="lang-opt" data-lang="lt"><span class="lang-flag">🇱🇹</span> Lietuvių</button>
-        </div>
-      </div>
+      <!-- Przycisk wyboru języka / Language Button -->
+      <button id="btn-lang" class="icon-btn lang-btn" title="Język / Language" aria-label="Wybierz język">
+        <span class="btn-icon">🌐</span>
+        <span class="btn-label" id="current-lang-code">PL</span>
+      </button>
     </div>
   </header>
 
@@ -162,6 +151,17 @@
 
   <!-- Backdrop -->
   <div id="panel-backdrop" role="presentation"></div>
+
+  <!-- Floating Menu Wyboru Języka (ponad wszystkimi warstwami) -->
+  <div id="lang-dropdown" class="lang-dropdown hidden" role="menu" aria-label="Wybór języka">
+    <button class="lang-opt" data-lang="pl"><span class="lang-flag">🇵🇱</span> Polski</button>
+    <button class="lang-opt" data-lang="en"><span class="lang-flag">🇬🇧</span> English</button>
+    <button class="lang-opt" data-lang="de"><span class="lang-flag">🇩🇪</span> Deutsch</button>
+    <button class="lang-opt" data-lang="uk"><span class="lang-flag">🇺🇦</span> Українська</button>
+    <button class="lang-opt" data-lang="sk"><span class="lang-flag">🇸🇰</span> Slovenčina</button>
+    <button class="lang-opt" data-lang="cs"><span class="lang-flag">🇨🇿</span> Čeština</button>
+    <button class="lang-opt" data-lang="lt"><span class="lang-flag">🇱🇹</span> Lietuvių</button>
+  </div>
 
   <!-- ══ PANEL DOLNY ═══════════════════════════════════════════════ -->
   <aside id="bottom-panel" role="complementary" aria-label="Informacje o grzybobraniu">
@@ -256,7 +256,7 @@
 
 
 <!-- Główna aplikacja (ES modules) -->
-<script type="module" src="js/app.js?v=13.0"></script>
+<script type="module" src="js/app.js?v=13.1"></script>
 
 <!-- Service Worker Cache Purge & Register -->
 <script>
@@ -269,7 +269,7 @@
     if ('caches' in window) {
       caches.keys().then(names => {
         for (const name of names) {
-          if (!name.includes('v4')) {
+          if (!name.includes('v5')) {
             caches.delete(name);
           }
         }
