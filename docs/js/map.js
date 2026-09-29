@@ -283,11 +283,11 @@ function createTrailsWMSLayer() {
   });
 
   const turystykaLayer = L.tileLayer.wms(WMS_BDL_URL, {
-    layers: '19,20,21',
+    layers: '1,4,13,15,16,17,19,20,21',
     format: 'image/png',
     transparent: true,
     opacity: 0.85,
-    attribution: '© Lasy Państwowe BDL (Turystyka)',
+    attribution: '© Lasy Państwowe BDL (Turystyka i Miejsca Postoju)',
     maxZoom: 19,
     version: '1.3.0',
   });

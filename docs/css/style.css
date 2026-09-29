@@ -1453,6 +1453,15 @@ html, body {
   background: #34d399;
   box-shadow: 0 0 5px rgba(52, 211, 153, 0.5);
 }
+.trails-dot-icon {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+}
 .trails-legend-note {
   margin-top: 8px; font-size: 10px; color: var(--text-muted);
   border-top: 1px solid var(--border); padding-top: 6px;

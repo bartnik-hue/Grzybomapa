@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/style.css?v=5.5" />
+  <link rel="stylesheet" href="css/style.css?v=5.6" />
 </head>
 <body>
 
@@ -161,6 +161,14 @@
         <span class="trails-dot trails-dot-horse"></span>
         <span data-i18n="trailsHorse">Ścieżki konne</span>
       </div>
+      <div class="trails-legend-item">
+        <span class="trails-dot-icon">🅿️</span>
+        <span data-i18n="trailsParking">Miejsca Postoju (MPP) / Parkingi LP</span>
+      </div>
+      <div class="trails-legend-item">
+        <span class="trails-dot-icon">⛔</span>
+        <span data-i18n="trailsNoEntry">Dukty leśne — zakaz wjazdu autem</span>
+      </div>
     </div>
     <div class="trails-legend-note" data-i18n="trailsNote">Dane: BDL Lasy Państwowe · Waymarked Trails</div>
   </div>
@@ -228,6 +236,15 @@
           <div class="help-step-content">
             <h3 data-i18n="helpStep4Title">4. Warstwy leśne i ścieżki</h3>
             <p data-i18n="helpStep4Desc">Przełączaj Szanse (🌡️) dla mapy cieplnej, Gatunki drzew (🌲) z Lasów Państwowych oraz Ścieżki (🥾) z duktami leśnymi i szlakami.</p>
+          </div>
+        </div>
+
+        <!-- Krok 5: Wjazd samochodem i parkingi -->
+        <div class="help-step">
+          <div class="help-step-icon">🚗</div>
+          <div class="help-step-content">
+            <h3 data-i18n="helpStep5Title">5. Samochód i wjazd do lasu</h3>
+            <p data-i18n="helpStep5Desc">Wjazd na drogi leśne jest co do zasady ZABRONIONY (Art. 29 Ustawy o Lasach) — brak szlabanu nie oznacza zgody! Parkuj wyłącznie na oznakowanych parkingach leśnych i Miejscach Postoju Pojazdów (MPP). Włącz warstwę Ścieżki (🥾) aby je zobaczyć, a po zaparkowaniu użyj „Dodaj znacznik” (🚗), by bez trudu wrócić do auta.</p>
           </div>
         </div>
 
@@ -399,7 +416,7 @@
 
 
 <!-- Główna aplikacja (ES modules) -->
-<script type="module" src="js/app.js?v=13.3"></script>
+<script type="module" src="js/app.js?v=13.4"></script>
 
 <!-- Service Worker Cache Purge & Register -->
 <script>
