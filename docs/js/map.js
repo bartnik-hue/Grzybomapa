@@ -4,6 +4,7 @@
  */
 
 import { t } from './i18n.js';
+import { haversineDistance } from './location.js';
 
 let map = null;
 let userMarker = null;
@@ -15,6 +16,8 @@ let trailsLayer = null;             // nakładka WMS szlaków turystycznych LP
 let pinMarker = null;        // marker ręcznie wybranego punktu
 let pinModeActive = false;  // czy tryb kliknij-na-mapę jest włączony
 let onMapClickCb = null;    // callback(lat, lng) przy kliknięciu
+let userPoiMarkersLayer = null; // warstwa własnych znaczników (np. samochód)
+const userPoiMarkersMap = new Map(); // id -> L.marker
 
 // Stan nakładki szlaków
 let _showTrails = false;
@@ -214,6 +217,9 @@ export function initMap(containerId = 'map') {
     maxZoom: 19,
     crossOrigin: true,
   }).addTo(map);
+
+  // Warstwa własnych znaczników (np. samochód)
+  userPoiMarkersLayer = L.layerGroup().addTo(map);
 
 
   // Odśwież nakładkę typów lasu po zakończeniu przesuwania/zoomowania
@@ -487,4 +493,102 @@ export function removePin() {
  */
 export function isPinModeActive() {
   return pinModeActive;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Dodaj zapisany znacznik użytkownika na mapie (np. zaparkowany samochód)
+ */
+export function addUserPoiMarkerToMap(markerData, onMarkerDelete, getUserCoords) {
+  if (!map || !userPoiMarkersLayer) return null;
+
+  if (userPoiMarkersMap.has(markerData.id)) {
+    userPoiMarkersLayer.removeLayer(userPoiMarkersMap.get(markerData.id));
+    userPoiMarkersMap.delete(markerData.id);
+  }
+
+  const iconEmoji = markerData.icon || '📍';
+  const customIcon = L.divIcon({
+    className: 'custom-poi-marker-container',
+    html: `
+      <div class="user-poi-marker" title="${escapeHtml(markerData.name)}">
+        <div class="user-poi-pin">
+          <span class="user-poi-emoji">${iconEmoji}</span>
+          <div class="user-poi-pulse"></div>
+        </div>
+        <div class="user-poi-label">${escapeHtml(markerData.name)}</div>
+      </div>`,
+    iconSize: [80, 54],
+    iconAnchor: [40, 20],
+    popupAnchor: [0, -22],
+  });
+
+  const marker = L.marker([markerData.lat, markerData.lng], {
+    icon: customIcon,
+    zIndexOffset: 1200,
+  }).addTo(userPoiMarkersLayer);
+
+  marker.bindPopup(() => {
+    let distStr = '';
+    const userPos = getUserCoords?.();
+    if (userPos && userPos.lat && userPos.lng) {
+      const d = haversineDistance(userPos.lat, userPos.lng, markerData.lat, markerData.lng);
+      distStr = d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`;
+    }
+
+    const dateStr = markerData.createdAt
+      ? new Date(markerData.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+
+    const div = document.createElement('div');
+    div.className = 'user-poi-popup';
+    div.innerHTML = `
+      <div class="user-poi-popup-header">
+        <span class="user-poi-popup-icon">${iconEmoji}</span>
+        <div class="user-poi-popup-title">${escapeHtml(markerData.name)}</div>
+      </div>
+      <div class="user-poi-popup-coords">📍 ${markerData.lat.toFixed(5)}, ${markerData.lng.toFixed(5)}</div>
+      ${distStr ? `<div class="user-poi-popup-dist">📏 ${t('markerDistFromYou', { dist: distStr })}</div>` : ''}
+      ${dateStr ? `<div class="user-poi-popup-date">🕒 ${t('markerAddedAt')} ${dateStr}</div>` : ''}
+      <div class="user-poi-popup-actions">
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${markerData.lat},${markerData.lng}" target="_blank" rel="noopener" class="user-poi-btn user-poi-btn-nav">
+          🗺️ ${t('markerNavigateBtn')}
+        </a>
+        <button type="button" class="user-poi-btn user-poi-btn-delete" data-marker-id="${markerData.id}">
+          🗑️ ${t('markerDeleteBtn')}
+        </button>
+      </div>
+    `;
+
+    div.querySelector('.user-poi-btn-delete')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      marker.closePopup();
+      onMarkerDelete?.(markerData.id);
+    });
+
+    return div;
+  });
+
+  userPoiMarkersMap.set(markerData.id, marker);
+  return marker;
+}
+
+/**
+ * Usuń zapisany znacznik z mapy
+ */
+export function removeUserPoiMarkerFromMap(markerId) {
+  if (userPoiMarkersMap.has(markerId)) {
+    const marker = userPoiMarkersMap.get(markerId);
+    if (userPoiMarkersLayer) userPoiMarkersLayer.removeLayer(marker);
+    userPoiMarkersMap.delete(markerId);
+  }
 }

@@ -268,6 +268,96 @@ html, body {
   }
 }
 
+/* ── Grupa przycisku GPS i Znacznika ─────────────────── */
+@media (min-width: 641px) {
+  .header-actions {
+    overflow: visible;
+  }
+}
+
+.gps-btn-group {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gps-sub-menu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding-top: 6px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+}
+
+/* Mostek zapobiegający utracie hover podczas przesuwania myszy */
+.gps-sub-menu::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.gps-btn-group:hover .gps-sub-menu,
+.gps-btn-group:focus-within .gps-sub-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.btn-add-marker {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 140px;
+  height: 38px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(14, 26, 20, 0.96);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 14px rgba(74, 222, 128, 0.25);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-add-marker:hover {
+  background: rgba(22, 44, 32, 0.98);
+  border-color: var(--green-primary);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), 0 0 18px rgba(74, 222, 128, 0.4);
+  transform: translateY(-1px);
+}
+
+.marker-label-desktop {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: #e2e8f0;
+}
+
+.btn-add-marker:hover .marker-label-desktop {
+  color: var(--green-primary);
+}
+
+.marker-label-mobile {
+  display: none;
+}
+
 /* ── Responsywność menu górnego na telefonach ─────────── */
 @media (max-width: 640px) {
   #header {
@@ -289,6 +379,60 @@ html, body {
   }
   .header-actions {
     gap: 4.5px;
+  }
+  .gps-btn-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: inherit;
+    position: static;
+  }
+  .gps-sub-menu {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    padding-top: 0;
+    z-index: auto;
+    display: flex;
+  }
+  .gps-sub-menu::before {
+    display: none;
+  }
+  .btn-add-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 46px;
+    padding: 2px 3px;
+    border-radius: 9px;
+    background: var(--glass-bg);
+    border: 1px solid var(--border);
+    box-shadow: none;
+    gap: 1px;
+    transform: none !important;
+  }
+  .btn-add-marker:hover {
+    background: var(--bg-card-hover);
+    color: var(--green-primary);
+    border-color: var(--border-bright);
+    box-shadow: none;
+  }
+  .marker-label-desktop {
+    display: none;
+  }
+  .marker-label-mobile {
+    display: block;
+    font-size: 8px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.2px;
+    color: var(--text-secondary);
+    text-align: center;
+    white-space: nowrap;
   }
   .icon-btn {
     min-width: 44px;
@@ -318,6 +462,15 @@ html, body {
   .header-actions {
     gap: 3.5px;
   }
+  .btn-add-marker {
+    min-width: 42px;
+    height: 44px;
+    padding: 2px 2px;
+    border-radius: 8px;
+  }
+  .marker-label-mobile {
+    font-size: 7.5px;
+  }
   .icon-btn {
     min-width: 42px;
     height: 44px;
@@ -339,6 +492,15 @@ html, body {
   }
   .header-actions {
     gap: 2.5px;
+  }
+  .btn-add-marker {
+    min-width: 39px;
+    height: 42px;
+    padding: 1px 2px;
+    border-radius: 8px;
+  }
+  .marker-label-mobile {
+    font-size: 7px;
   }
   .icon-btn {
     min-width: 39px;
@@ -1783,5 +1945,350 @@ html, body {
     width: 100%;
     justify-content: center;
   }
+}
+
+/* ── Modal Dodawania Znacznika ──────────────────────── */
+.modal-marker-container {
+  max-width: 440px;
+}
+
+.marker-modal-body {
+  padding: 16px 20px;
+  gap: 14px;
+}
+
+.marker-location-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(14, 26, 20, 0.7);
+  border: 1px solid rgba(74, 222, 128, 0.18);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.marker-loc-icon {
+  font-size: 20px;
+}
+
+.marker-loc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marker-loc-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.marker-loc-coords {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-primary);
+  font-family: monospace;
+}
+
+.marker-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.marker-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.marker-input-wrap {
+  width: 100%;
+}
+
+.marker-text-input {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(10, 18, 14, 0.85);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.marker-text-input:focus {
+  border-color: var(--green-primary);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2);
+}
+
+.marker-presets-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marker-presets-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.marker-presets-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  background: rgba(22, 38, 29, 0.6);
+  border: 1px solid rgba(74, 222, 128, 0.15);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.preset-chip:hover {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #fff;
+}
+
+.preset-chip.active {
+  background: rgba(74, 222, 128, 0.22);
+  border-color: var(--green-primary);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.25);
+}
+
+.chip-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.marker-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(74, 222, 128, 0.15);
+  background: rgba(14, 24, 19, 0.6);
+}
+
+.modal-cancel-btn {
+  padding: 9px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.marker-save-btn {
+  padding: 9px 18px;
+  background: linear-gradient(135deg, #166534 0%, var(--green-primary) 100%);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  border-radius: 9px;
+  color: #0b1612;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(74, 222, 128, 0.3);
+  transition: all 0.15s ease;
+}
+
+.marker-save-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 18px rgba(74, 222, 128, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ── Własne znaczniki na mapie (POI / Samochód) ──────── */
+.custom-poi-marker-container {
+  overflow: visible !important;
+}
+
+.user-poi-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.user-poi-marker:hover {
+  transform: scale(1.15) translateY(-2px);
+  z-index: 2000;
+}
+
+.user-poi-pin {
+  width: 38px;
+  height: 38px;
+  background: rgba(14, 24, 19, 0.95);
+  border: 2px solid #60a5fa;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 14px rgba(96, 165, 250, 0.5), 0 4px 12px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.user-poi-emoji {
+  font-size: 21px;
+  line-height: 1;
+  user-select: none;
+}
+
+.user-poi-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(96, 165, 250, 0.4);
+  animation: poiPulseRing 2.2s infinite;
+  pointer-events: none;
+}
+
+@keyframes poiPulseRing {
+  0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
+  60% { transform: translate(-50%, -50%) scale(1.7); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1.7); opacity: 0; }
+}
+
+.user-poi-label {
+  margin-top: 3px;
+  background: rgba(11, 20, 16, 0.94);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  max-width: 140px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+/* Popup znacznika */
+.user-poi-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 4px 2px;
+  min-width: 190px;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.user-poi-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 6px;
+}
+
+.user-poi-popup-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.user-poi-popup-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  word-break: break-word;
+}
+
+.user-poi-popup-coords {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.user-poi-popup-dist {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #60a5fa;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.user-poi-popup-date {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.user-poi-popup-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.user-poi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.user-poi-btn-nav {
+  background: rgba(96, 165, 250, 0.2);
+  border-color: rgba(96, 165, 250, 0.4);
+  color: #60a5fa;
+  flex: 1;
+}
+
+.user-poi-btn-nav:hover {
+  background: rgba(96, 165, 250, 0.35);
+  color: #fff;
+}
+
+.user-poi-btn-delete {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.user-poi-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
 }
 

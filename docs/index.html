@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/style.css?v=5.4" />
+  <link rel="stylesheet" href="css/style.css?v=5.5" />
 </head>
 <body>
 
@@ -62,10 +62,20 @@
         <span class="btn-icon">📌</span>
         <span class="btn-label" data-i18n="btnPin">Próbnik</span>
       </button>
-      <button id="btn-locate" class="icon-btn" title="Lokalizator GPS na żywo" aria-label="Lokalizuj mnie GPS">
-        <span class="btn-icon">🎯</span>
-        <span class="btn-label" data-i18n="btnGps">GPS</span>
-      </button>
+      <!-- Grupa GPS i Znacznik -->
+      <div class="gps-btn-group" id="gps-btn-group">
+        <button id="btn-locate" class="icon-btn" title="Lokalizator GPS na żywo" aria-label="Lokalizuj mnie GPS">
+          <span class="btn-icon">🎯</span>
+          <span class="btn-label" data-i18n="btnGps">GPS</span>
+        </button>
+        <div class="gps-sub-menu" id="gps-sub-menu">
+          <button id="btn-add-marker" class="icon-btn btn-add-marker" title="Postaw znacznik w miejscu gdzie jesteś (np. samochód)" aria-label="Dodaj znacznik">
+            <span class="btn-icon">📍</span>
+            <span class="btn-label marker-label-mobile" data-i18n="btnAddMarkerShort">Znacznik</span>
+            <span class="marker-label-desktop" data-i18n="btnAddMarker">Dodaj znacznik</span>
+          </button>
+        </div>
+      </div>
 
       <!-- Przycisk Instrukcja / Help Button -->
       <button id="btn-help" class="icon-btn" title="Instrukcja obsługi" aria-label="Instrukcja obsługi">
@@ -243,6 +253,59 @@
     </div>
   </div>
 
+  <!-- Modal Dodawania Znacznika (np. Zaparkowany Samochód) -->
+  <div id="modal-marker" class="modal-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="modal-marker-title">
+    <div class="modal-backdrop" id="modal-marker-backdrop"></div>
+    <div class="modal-container modal-marker-container">
+      <header class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon" id="marker-modal-icon-display">🚗</span>
+          <div>
+            <h2 id="modal-marker-title" data-i18n="markerModalTitle">Dodaj znacznik miejsca</h2>
+            <p class="modal-subtitle" data-i18n="markerModalSub">Zapisz bieżącą pozycję GPS, np. gdzie stoi samochód</p>
+          </div>
+        </div>
+        <button id="btn-close-marker" class="modal-close-btn" aria-label="Zamknij">✕</button>
+      </header>
+
+      <div class="modal-body marker-modal-body">
+        <div class="marker-location-preview">
+          <span class="marker-loc-icon">🎯</span>
+          <div class="marker-loc-text">
+            <span class="marker-loc-label" data-i18n="markerCurrentLoc">Lokalizacja GPS:</span>
+            <span id="marker-loc-coords" class="marker-loc-coords">—</span>
+          </div>
+        </div>
+
+        <div class="marker-form-group">
+          <label class="marker-field-label" for="marker-name-input" data-i18n="markerNameLabel">Nazwa znacznika:</label>
+          <div class="marker-input-wrap">
+            <input type="text" id="marker-name-input" class="marker-text-input" placeholder="np. Samochód" maxlength="40" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="marker-presets-wrap">
+          <div class="marker-presets-label" data-i18n="markerPresetsLabel">Szybkie propozycje:</div>
+          <div class="marker-presets-chips">
+            <button type="button" class="preset-chip active" data-icon="🚗" data-preset-key="markerPresetCar"><span class="chip-icon">🚗</span> <span data-i18n="markerPresetCar">Samochód</span></button>
+            <button type="button" class="preset-chip" data-icon="🏕️" data-preset-key="markerPresetCamp"><span class="chip-icon">🏕️</span> <span data-i18n="markerPresetCamp">Baza / Namiot</span></button>
+            <button type="button" class="preset-chip" data-icon="🍄" data-preset-key="markerPresetMushroom"><span class="chip-icon">🍄</span> <span data-i18n="markerPresetMushroom">Dobre grzyby</span></button>
+            <button type="button" class="preset-chip" data-icon="🚲" data-preset-key="markerPresetBike"><span class="chip-icon">🚲</span> <span data-i18n="markerPresetBike">Rower</span></button>
+            <button type="button" class="preset-chip" data-icon="🚪" data-preset-key="markerPresetEntrance"><span class="chip-icon">🚪</span> <span data-i18n="markerPresetEntrance">Wejście do lasu</span></button>
+            <button type="button" class="preset-chip" data-icon="📍" data-preset-key="markerPresetPoint"><span class="chip-icon">📍</span> <span data-i18n="markerPresetPoint">Punkt</span></button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="modal-footer marker-modal-footer">
+        <button type="button" id="btn-cancel-marker" class="modal-cancel-btn" data-i18n="markerCancelBtn">Anuluj</button>
+        <button type="button" id="btn-save-marker" class="modal-action-btn marker-save-btn">
+          <span data-i18n="markerSaveBtn">Zapisz znacznik</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+
   <!-- ══ PANEL DOLNY ═══════════════════════════════════════════════ -->
   <aside id="bottom-panel" role="complementary" aria-label="Informacje o grzybobraniu">
 
@@ -336,7 +399,7 @@
 
 
 <!-- Główna aplikacja (ES modules) -->
-<script type="module" src="js/app.js?v=13.2"></script>
+<script type="module" src="js/app.js?v=13.3"></script>
 
 <!-- Service Worker Cache Purge & Register -->
 <script>

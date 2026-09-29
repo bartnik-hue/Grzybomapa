@@ -9,7 +9,7 @@ import { getForestData, getForestBoundary } from './forest_api.js';
 import { getWeatherData, weatherCodeToText, weatherCodeToIcon } from './weather.js';
 import { getMushroomsForStand, getMushroomsForMixedForest, filterBySeason, TREE_SPECIES } from './mushroom_knowledge.js';
 import { scoreAllMushrooms, calculateOverallScore, calculateDailyForecastScores, generateSummary, generateDetailedDiagnosis, edibleLabel, scoreToColor, scoreToLabel } from './scoring.js';
-import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleTreeSpeciesLayer, toggleTrailsLayer, isTrailsVisible, getMap } from './map.js';
+import { initMap, updateUserPosition, showForestBoundary, panTo, setPinMode, setPin, removePin, isPinModeActive, toggleTreeSpeciesLayer, toggleTrailsLayer, isTrailsVisible, getMap, addUserPoiMarkerToMap, removeUserPoiMarkerFromMap } from './map.js';
 import { initHeatmap, updateHeatmap, toggleHeatmap, isHeatmapVisible, setHeatmapCenter } from './heatmap.js?v=8.0';
 import { t, getLang, setLang, onLanguageChange, getTreeSpeciesName, decodeHabitat, getMushroomName, LANGUAGES } from './i18n.js';
 
@@ -54,8 +54,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicjalizacja modala instrukcji / przewodnika
   initHelpModal();
 
+  // Inicjalizacja modala dodawania znacznika i załadowanie zapisanych znaczników
+  initMarkerModal();
+  loadAllSavedUserMarkers();
+
   // Bindowania przycisków
   $('btn-locate').addEventListener('click', onLocateClick);
+  $('btn-add-marker')?.addEventListener('click', onAddMarkerClick);
   $('btn-pin-mode').addEventListener('click', onPinModeClick);
   $('fab-panel').addEventListener('click', togglePanel);
   $('btn-panel-toggle').addEventListener('click', closePanel);
@@ -206,6 +211,227 @@ function initHelpModal() {
   } catch {}
 }
 
+// ── Własne znaczniki miejsc (np. Samochód) ──────────────────────────
+const USER_MARKERS_STORAGE_KEY = 'grzybomapa_user_markers';
+let markerTargetCoords = null;
+let currentMarkerIcon = '🚗';
+let currentMarkerPresetKey = 'markerPresetCar';
+
+function getSavedUserMarkers() {
+  try {
+    const raw = localStorage.getItem(USER_MARKERS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error('Failed to parse saved user markers', e);
+    return [];
+  }
+}
+
+function saveUserMarkerToStorage(marker) {
+  try {
+    const list = getSavedUserMarkers();
+    list.push(marker);
+    localStorage.setItem(USER_MARKERS_STORAGE_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error('Failed to save user marker', e);
+  }
+}
+
+function removeUserMarkerFromStorage(markerId) {
+  try {
+    const list = getSavedUserMarkers().filter(m => m.id !== markerId);
+    localStorage.setItem(USER_MARKERS_STORAGE_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error('Failed to remove user marker', e);
+  }
+}
+
+function loadAllSavedUserMarkers() {
+  const list = getSavedUserMarkers();
+  list.forEach(marker => {
+    addUserPoiMarkerToMap(
+      marker,
+      (id) => {
+        removeUserMarkerFromStorage(id);
+        removeUserPoiMarkerFromMap(id);
+        setStatus(t('markerDeletedMsg'), 'info');
+      },
+      () => ({ lat: state.lat, lng: state.lng })
+    );
+  });
+}
+
+function openMarkerModal(lat, lng) {
+  markerTargetCoords = { lat, lng };
+  currentMarkerIcon = '🚗';
+  currentMarkerPresetKey = 'markerPresetCar';
+
+  const modal = $('modal-marker');
+  const coordsEl = $('marker-loc-coords');
+  const input = $('marker-name-input');
+  const iconDisplay = $('marker-modal-icon-display');
+
+  if (coordsEl) {
+    coordsEl.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+
+  if (iconDisplay) {
+    iconDisplay.textContent = currentMarkerIcon;
+  }
+
+  // Zresetuj aktywne chipy
+  const chips = document.querySelectorAll('.preset-chip');
+  chips.forEach(c => {
+    if (c.getAttribute('data-preset-key') === 'markerPresetCar') {
+      c.classList.add('active');
+    } else {
+      c.classList.remove('active');
+    }
+  });
+
+  if (input) {
+    input.value = t('markerPresetCar');
+  }
+
+  modal?.classList.remove('hidden');
+
+  setTimeout(() => {
+    input?.focus();
+    input?.select();
+  }, 100);
+}
+
+function closeMarkerModal() {
+  const modal = $('modal-marker');
+  modal?.classList.add('hidden');
+  markerTargetCoords = null;
+}
+
+function onSaveNewMarker() {
+  if (!markerTargetCoords) return;
+
+  const input = $('marker-name-input');
+  let label = input ? input.value.trim() : '';
+  if (!label) {
+    label = t(currentMarkerPresetKey) || 'Samochód';
+  }
+
+  const newMarker = {
+    id: 'user_marker_' + Date.now(),
+    lat: markerTargetCoords.lat,
+    lng: markerTargetCoords.lng,
+    name: label,
+    icon: currentMarkerIcon || '🚗',
+    createdAt: new Date().toISOString(),
+  };
+
+  saveUserMarkerToStorage(newMarker);
+
+  addUserPoiMarkerToMap(
+    newMarker,
+    (id) => {
+      removeUserMarkerFromStorage(id);
+      removeUserPoiMarkerFromMap(id);
+      setStatus(t('markerDeletedMsg'), 'info');
+    },
+    () => ({ lat: state.lat, lng: state.lng })
+  );
+
+  closeMarkerModal();
+  panTo(newMarker.lat, newMarker.lng, 16);
+  setStatus(t('markerCreatedMsg', { name: newMarker.name }), 'info');
+}
+
+async function onAddMarkerClick() {
+  let lat = state.lat;
+  let lng = state.lng;
+
+  // Jeśli brak współrzędnych, pobierz świeżą lokalizację GPS
+  if (!lat || !lng) {
+    const btn = $('btn-add-marker');
+    btn?.classList.add('loading');
+    setStatus(t('gpsFetching'), 'info');
+
+    try {
+      const pos = await getCurrentPosition();
+      state.lat = pos.lat;
+      state.lng = pos.lng;
+      state.accuracy = pos.accuracy;
+      updateUserPosition(pos.lat, pos.lng, pos.accuracy, false);
+      lat = pos.lat;
+      lng = pos.lng;
+      setStatus('', 'info');
+    } catch (e) {
+      btn?.classList.remove('loading');
+      showError(getGpsError(e));
+      return;
+    } finally {
+      btn?.classList.remove('loading');
+    }
+  }
+
+  openMarkerModal(lat, lng);
+}
+
+function initMarkerModal() {
+  const chips = document.querySelectorAll('.preset-chip');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const icon = chip.getAttribute('data-icon');
+      const presetKey = chip.getAttribute('data-preset-key');
+      currentMarkerIcon = icon || '📍';
+      currentMarkerPresetKey = presetKey || '';
+
+      const input = $('marker-name-input');
+      if (input && presetKey) {
+        input.value = t(presetKey);
+        input.focus();
+        input.select();
+      }
+
+      const iconDisplay = $('marker-modal-icon-display');
+      if (iconDisplay) iconDisplay.textContent = currentMarkerIcon;
+    });
+  });
+
+  $('marker-name-input')?.addEventListener('input', (e) => {
+    const val = e.target.value.toLowerCase();
+    let detectedIcon = null;
+    if (val.includes('samochód') || val.includes('samochod') || val.includes('auto') || val.includes('car')) detectedIcon = '🚗';
+    else if (val.includes('rower') || val.includes('bike') || val.includes('kolo')) detectedIcon = '🚲';
+    else if (val.includes('namiot') || val.includes('baza') || val.includes('camp') || val.includes('tábor') || val.includes('tabor')) detectedIcon = '🏕️';
+    else if (val.includes('grzyb') || val.includes('borowik') || val.includes('mush') || val.includes('houb') || val.includes('gryb')) detectedIcon = '🍄';
+    else if (val.includes('wejście') || val.includes('wejscie') || val.includes('parking') || val.includes('vstup') || val.includes('brama')) detectedIcon = '🚪';
+
+    if (detectedIcon) {
+      currentMarkerIcon = detectedIcon;
+      const iconDisplay = $('marker-modal-icon-display');
+      if (iconDisplay) iconDisplay.textContent = detectedIcon;
+    }
+  });
+
+  $('marker-name-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onSaveNewMarker();
+    }
+  });
+
+  $('btn-save-marker')?.addEventListener('click', onSaveNewMarker);
+  $('btn-cancel-marker')?.addEventListener('click', closeMarkerModal);
+  $('btn-close-marker')?.addEventListener('click', closeMarkerModal);
+  $('modal-marker-backdrop')?.addEventListener('click', closeMarkerModal);
+
+  document.addEventListener('keydown', (e) => {
+    const modal = $('modal-marker');
+    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      closeMarkerModal();
+    }
+  });
+}
+
 function updateStaticTexts() {
   const lang = getLang();
   document.title = t('appTitle');
@@ -241,6 +467,11 @@ function updateStaticTexts() {
   if (bGps) {
     bGps.title = t('btnGpsTitle');
     bGps.setAttribute('aria-label', t('btnGpsTitle'));
+  }
+  const bAddMarker = $('btn-add-marker');
+  if (bAddMarker) {
+    bAddMarker.title = t('btnAddMarkerTitle');
+    bAddMarker.setAttribute('aria-label', t('btnAddMarkerTitle'));
   }
   const bHelp = $('btn-help');
   if (bHelp) {
