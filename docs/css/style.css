@@ -196,6 +196,83 @@ html, body {
   color: #fb923c !important;
 }
 
+/* ── Selektor języka (i18n) ─────────────────────────── */
+.lang-selector-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.lang-btn {
+  min-width: 44px;
+}
+
+.lang-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: rgba(15, 23, 20, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(74, 222, 128, 0.15);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 155px;
+  z-index: 1000;
+  animation: fadeInDown 0.18s ease;
+}
+
+.lang-dropdown.hidden {
+  display: none !important;
+}
+
+.lang-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.lang-opt:hover {
+  background: rgba(74, 222, 128, 0.18);
+  color: #fff;
+}
+
+.lang-opt.active {
+  background: rgba(74, 222, 128, 0.25);
+  color: var(--green-primary);
+  font-weight: 700;
+}
+
+.lang-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ── Responsywność menu górnego na telefonach ─────────── */
 @media (max-width: 640px) {
   #header {

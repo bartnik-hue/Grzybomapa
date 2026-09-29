@@ -3,7 +3,7 @@
  * Network-first dla plików aplikacji (gwarancja zawsze aktualnego kodu)
  */
 
-const CACHE = 'grzybomap-v4.2-network-first';
+const CACHE = 'grzybomap-v5.0-network-first';
 
 self.addEventListener('install', e => {
   self.skipWaiting();

@@ -19,6 +19,7 @@
  */
 
 import { scoreStand } from './scoring.js';
+import { t } from './i18n.js';
 
 const ELEVATION_API = 'https://api.open-meteo.com/v1/elevation';
 const BDL_OGC_BASE  = 'https://ogcapi.bdl.lasy.gov.pl/collections';
@@ -275,7 +276,7 @@ async function renderAndFetch() {
   drawAnalysisRect(centerLat, centerLng, AREA_KM);
 
   setLoading(true);
-  setStatus(`Pobieranie wydzieleń leśnych i rzeźby terenu…`);
+  setStatus(t('heatmapFetching'));
 
   try {
     const halfLat = latDeg(AREA_KM / 2);
@@ -308,16 +309,16 @@ async function renderAndFetch() {
       const temp  = lastWeather.avgNightTemp7?.toFixed(1) ?? '14';
       const days  = lastWeather.daysSinceRain ?? 4;
       const lpCount  = forestRings ? forestRings.filter(r => !r.missingLpData).length : 0;
-      let forestStatus = lpCount > 0 ? `🌲 ${lpCount} wydzieleń LP` : '🌲 Lasy poza ewidencją LP';
+      let forestStatus = lpCount > 0 ? t('heatmapLpCount', { count: lpCount }) : t('heatmapOsmLpCount');
       if (overlayResult.addedOsmPixels > 0) {
-        forestStatus += ` + lasy OSM (szacunek)`;
+        forestStatus += t('heatmapOsmAdded');
       }
-      setStatus(`${temp}°C nocą · ${rain}mm/14d · ${days}d po deszczu · ${forestStatus}`);
+      setStatus(t('heatmapStatusText', { temp, rain, days, status: forestStatus }));
     }
 
   } catch (e) {
     console.warn('[Heatmap] Render error:', e);
-    setStatus(`Obliczanie warunków zakończone`);
+    setStatus(t('heatmapCalcDone'));
   } finally {
     setLoading(false);
   }

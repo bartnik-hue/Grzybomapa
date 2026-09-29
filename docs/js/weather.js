@@ -191,20 +191,10 @@ function avg(arr) {
 function round1(v) { return Math.round(v * 10) / 10; }
 
 
-/**
- * Konwertuj kod WMO na opis pogody
- */
-export function weatherCodeToText(code) {
-  const codes = {
-    0: 'Bezchmurnie', 1: 'Głównie czyste', 2: 'Częściowe zachmurzenie', 3: 'Zachmurzenie',
-    45: 'Mgła', 48: 'Mgła oszraniająca',
-    51: 'Mżawka słaba', 53: 'Mżawka', 55: 'Mżawka silna',
-    61: 'Deszcz słaby', 63: 'Deszcz', 65: 'Deszcz ulewny',
-    71: 'Śnieg słaby', 73: 'Śnieg', 75: 'Śnieg intensywny',
-    80: 'Przelotny deszcz', 81: 'Przelotne opady', 82: 'Gwałtowna ulewa',
-    95: 'Burza', 96: 'Burza z gradem', 99: 'Silna burza z gradem',
-  };
-  return codes[code] || 'Nieznana pogoda';
+import { weatherCodeToLocalizedText } from './i18n.js';
+
+export function weatherCodeToText(code, lang) {
+  return weatherCodeToLocalizedText(code, lang);
 }
 
 export function weatherCodeToIcon(code) {

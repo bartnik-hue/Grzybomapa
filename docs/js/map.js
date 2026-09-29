@@ -3,6 +3,8 @@
  * Moduł mapy — Leaflet.js z warstwami WMS Lasów Państwowych
  */
 
+import { t } from './i18n.js';
+
 let map = null;
 let userMarker = null;
 let accuracyCircle = null;
@@ -175,9 +177,9 @@ export async function refreshForestTypeOverlay() {
       onEachFeature: (feature, layer) => {
         const code = feature.properties?.species_cd || '?';
         const type = getPrimaryForestType(code);
-        const typeLabel = type === 'deciduous' ? '🌳 Liściasty'
-                        : type === 'coniferous' ? '🌲 Iglasty'
-                        : '🌿 Mieszany';
+        const typeLabel = type === 'deciduous' ? t('ftlDeciduous')
+                        : type === 'coniferous' ? t('ftlConiferous')
+                        : t('ftlMixed');
         layer.bindTooltip(
           `<strong>${typeLabel}</strong><br><span style="font-size:11px;opacity:.8">${code}</span>`,
           { sticky: true, className: 'forest-type-tooltip' }
@@ -439,7 +441,7 @@ export function setPin(lat, lng) {
   const pinIcon = L.divIcon({
     className: 'custom-pin-container',
     html: `
-      <div class="pin-marker-wrapper" title="Próbnik: przeciągnij lub kliknij, aby zbadać to miejsce">
+      <div class="pin-marker-wrapper" title="${t('pinMarkerTitle')}">
         <div class="pin-marker-head">🍄</div>
         <div class="pin-marker-pulse"></div>
       </div>`,

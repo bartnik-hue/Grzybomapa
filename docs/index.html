@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/style.css?v=5.1" />
+  <link rel="stylesheet" href="css/style.css?v=5.2" />
 </head>
 <body>
 
@@ -26,7 +26,7 @@
 <div id="splash">
   <div class="splash-icon">🍄</div>
   <div class="splash-title">GrzyboMapa</div>
-  <div class="splash-sub">Twój leśny kompas</div>
+  <div class="splash-sub" data-i18n="appSub">Twój leśny kompas</div>
   <div class="splash-dots">
     <div class="splash-dot"></div>
     <div class="splash-dot"></div>
@@ -48,24 +48,41 @@
 
       <button id="btn-tree-species" class="icon-btn" title="Gatunki drzewostanu BDL (liściaste, iglaste, mieszane)" aria-label="Pokaż gatunki drzewostanu">
         <span class="btn-icon">🌲</span>
-        <span class="btn-label">Gatunki drzew</span>
+        <span class="btn-label" data-i18n="btnTreeSpecies">Gatunki drzew</span>
       </button>
       <button id="btn-heatmap" class="icon-btn" title="Mapa cieplna warunków grzybobrania" aria-label="Włącz mapę cieplną">
         <span class="btn-icon">🌡️</span>
-        <span class="btn-label">Szanse</span>
+        <span class="btn-label" data-i18n="btnHeatmap">Szanse</span>
       </button>
       <button id="btn-trails" class="icon-btn" title="Szlaki turystyczne i ścieżki leśne LP" aria-label="Pokaż szlaki turystyczne">
         <span class="btn-icon">🥾</span>
-        <span class="btn-label">Ścieżki</span>
+        <span class="btn-label" data-i18n="btnTrails">Ścieżki</span>
       </button>
       <button id="btn-pin-mode" class="icon-btn" title="Próbnik Terenu — postaw lub przesuń pinezkę" aria-label="Próbnik terenu">
         <span class="btn-icon">📌</span>
-        <span class="btn-label">Próbnik</span>
+        <span class="btn-label" data-i18n="btnPin">Próbnik</span>
       </button>
       <button id="btn-locate" class="icon-btn" title="Lokalizator GPS na żywo" aria-label="Lokalizuj mnie GPS">
         <span class="btn-icon">🎯</span>
-        <span class="btn-label">GPS</span>
+        <span class="btn-label" data-i18n="btnGps">GPS</span>
       </button>
+
+      <!-- Selektor języka / Language Selector -->
+      <div class="lang-selector-wrap" id="lang-selector-wrap">
+        <button id="btn-lang" class="icon-btn lang-btn" title="Język / Language" aria-label="Wybierz język">
+          <span class="btn-icon">🌐</span>
+          <span class="btn-label" id="current-lang-code">PL</span>
+        </button>
+        <div id="lang-dropdown" class="lang-dropdown hidden">
+          <button class="lang-opt" data-lang="pl"><span class="lang-flag">🇵🇱</span> Polski</button>
+          <button class="lang-opt" data-lang="en"><span class="lang-flag">🇬🇧</span> English</button>
+          <button class="lang-opt" data-lang="de"><span class="lang-flag">🇩🇪</span> Deutsch</button>
+          <button class="lang-opt" data-lang="uk"><span class="lang-flag">🇺🇦</span> Українська</button>
+          <button class="lang-opt" data-lang="sk"><span class="lang-flag">🇸🇰</span> Slovenčina</button>
+          <button class="lang-opt" data-lang="cs"><span class="lang-flag">🇨🇿</span> Čeština</button>
+          <button class="lang-opt" data-lang="lt"><span class="lang-flag">🇱🇹</span> Lietuvių</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -73,12 +90,12 @@
   <div id="map" role="application" aria-label="Mapa interaktywna"></div>
 
   <!-- FAB — Pokaż wyniki -->
-  <button id="fab-panel" aria-label="Pokaż wyniki grzybobrania">
+  <button id="fab-panel" aria-label="Pokaż wyniki grzybobrania" data-i18n="fabShowResults">
     🍄 Pokaż wyniki
   </button>
 
   <!-- Tooltip pinezki (pojawia się nad FAB gdy tryb aktywny) -->
-  <div id="pin-hint" class="pin-hint hidden">
+  <div id="pin-hint" class="pin-hint hidden" data-i18n="pinHint">
     👆 Kliknij w dowolne miejsce na mapie
   </div>
 
@@ -87,60 +104,60 @@
 
   <!-- Legenda heatmapy (ukryta domyślnie) -->
   <div id="heatmap-legend" class="heatmap-legend hidden" aria-label="Legenda mapy cieplnej">
-    <div class="heatmap-legend-title">🌡️ Warunki grzybobrania</div>
+    <div class="heatmap-legend-title" data-i18n="heatmapTitle">🌡️ Warunki grzybobrania</div>
     <div class="heatmap-gradient-bar">
-      <span class="heatmap-label-lo">Niekorzystne</span>
+      <span class="heatmap-label-lo" data-i18n="heatmapLo">Niekorzystne</span>
       <div class="heatmap-gradient"></div>
-      <span class="heatmap-label-hi">Idealne</span>
+      <span class="heatmap-label-hi" data-i18n="heatmapHi">Idealne</span>
     </div>
     <div class="heatmap-legend-note">
-      Teren × Pogoda × Sezon &middot; <span id="heatmap-status">ustaw lokalizację aby aktywować</span>
+      <span data-i18n="heatmapFormula">Teren × Pogoda × Sezon</span> &middot; <span id="heatmap-status" data-i18n="heatmapPromptLoc">ustaw lokalizację aby aktywować</span>
     </div>
     <div id="heatmap-loading" class="heatmap-loading-bar hidden"></div>
   </div>
 
   <!-- Legenda nakładek typów lasu (ukryta domyślnie) -->
   <div id="forest-type-legend" class="forest-type-legend hidden" aria-label="Legenda typów lasu">
-    <div class="ftl-title">🌿 Typ drzewostanu</div>
+    <div class="ftl-title" data-i18n="ftlTitle">🌿 Typ drzewostanu</div>
     <div class="ftl-items">
       <div class="ftl-item" id="ftl-deciduous">
         <span class="ftl-dot ftl-dot-deciduous"></span>
-        <span>🌳 Liściaste</span>
+        <span data-i18n="ftlDeciduous">🌳 Liściaste</span>
       </div>
       <div class="ftl-item" id="ftl-coniferous">
         <span class="ftl-dot ftl-dot-coniferous"></span>
-        <span>🌲 Iglaste</span>
+        <span data-i18n="ftlConiferous">🌲 Iglaste</span>
       </div>
       <div class="ftl-item ftl-item-mixed">
         <span class="ftl-dot ftl-dot-mixed"></span>
-        <span>🌿 Mieszane</span>
+        <span data-i18n="ftlMixed">🌿 Mieszane</span>
       </div>
     </div>
-    <div class="ftl-note">Dane BDL LP · Przybliż mapę (&gt;zoom 11)</div>
+    <div class="ftl-note" data-i18n="ftlNote">Dane BDL LP · Przybliż mapę (&gt;zoom 11)</div>
   </div>
 
   <!-- Legenda szlaków turystycznych LP i ścieżek (ukryta domyślnie) -->
   <div id="trails-legend" class="trails-legend hidden" aria-label="Legenda szlaków i ścieżek leśnych">
-    <div class="trails-legend-title">🥾 Szlaki i ścieżki leśne</div>
+    <div class="trails-legend-title" data-i18n="trailsTitle">🥾 Szlaki i ścieżki leśne</div>
     <div class="trails-legend-items">
       <div class="trails-legend-item">
         <span class="trails-dot trails-dot-oddzialy"></span>
-        <span>Linie i oddziały LP (dukty)</span>
+        <span data-i18n="trailsLines">Linie i oddziały LP (dukty)</span>
       </div>
       <div class="trails-legend-item">
         <span class="trails-dot trails-dot-hiking"></span>
-        <span>Szlaki turystyczne PTTK</span>
+        <span data-i18n="trailsHiking">Szlaki turystyczne PTTK</span>
       </div>
       <div class="trails-legend-item">
         <span class="trails-dot trails-dot-didactic"></span>
-        <span>Ścieżki dydaktyczne</span>
+        <span data-i18n="trailsDidactic">Ścieżki dydaktyczne</span>
       </div>
       <div class="trails-legend-item">
         <span class="trails-dot trails-dot-horse"></span>
-        <span>Ścieżki konne</span>
+        <span data-i18n="trailsHorse">Ścieżki konne</span>
       </div>
     </div>
-    <div class="trails-legend-note">Dane: BDL Lasy Państwowe · Waymarked Trails</div>
+    <div class="trails-legend-note" data-i18n="trailsNote">Dane: BDL Lasy Państwowe · Waymarked Trails</div>
   </div>
 
   <!-- Backdrop -->
@@ -166,46 +183,46 @@
 
       <!-- Sekcja: Las -->
       <section class="section" aria-labelledby="section-forest-title">
-        <div class="section-title" id="section-forest-title">🌲 Informacje o lesie</div>
+        <div class="section-title" id="section-forest-title" data-i18n="secForestTitle">🌲 Informacje o lesie</div>
         <div id="forest-info">
           <div class="forest-empty">
             <span class="forest-icon">📍</span>
-            <p>Kliknij przycisk lokalizacji, aby wykryć las i sprawdzić warunki do grzybobrania.</p>
+            <p data-i18n="forestEmptyPrompt">Kliknij przycisk lokalizacji, aby wykryć las i sprawdzić warunki do grzybobrania.</p>
           </div>
         </div>
       </section>
 
       <!-- Sekcja: Pogoda -->
       <section class="section" aria-labelledby="section-weather-title">
-        <div class="section-title" id="section-weather-title">🌦️ Warunki pogodowe</div>
+        <div class="section-title" id="section-weather-title" data-i18n="secWeatherTitle">🌦️ Warunki pogodowe</div>
         <div id="weather-info">
-          <p class="no-data">Brak danych — włącz lokalizację</p>
+          <p class="no-data" data-i18n="weatherNoData">Brak danych — włącz lokalizację</p>
         </div>
       </section>
 
       <!-- Sekcja: Ocena ogólna -->
       <section class="section" aria-labelledby="section-score-title">
-        <div class="section-title" id="section-score-title">📊 Ocena warunków</div>
+        <div class="section-title" id="section-score-title" data-i18n="secScoreTitle">📊 Ocena warunków</div>
         <div class="score-card">
           <div class="score-header">
             <span id="score-emoji" style="font-size:36px">❓</span>
             <div>
               <div id="overall-score" class="score-number">—</div>
-              <div id="score-label" class="score-label">Brak danych</div>
+              <div id="score-label" class="score-label" data-i18n="scoreNoData">Brak danych</div>
             </div>
           </div>
           <div class="score-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
             <div id="score-bar-fill" class="score-bar-fill" style="width:0%;background:#6b7280"></div>
           </div>
-          <p id="summary-text" class="summary-text">
+          <p id="summary-text" class="summary-text" data-i18n="scoreSummaryPrompt">
             Włącz lokalizację GPS, aby otrzymać ocenę warunków do grzybobrania w Twoim lesie.
           </p>
           <p id="summary-tip"></p>
           <div id="score-diagnosis" class="score-diagnosis hidden">
-            <div class="diagnosis-header">🔍 Dlaczego taki wynik w tym punkcie?</div>
+            <div class="diagnosis-header" data-i18n="diagnosisHeader">🔍 Dlaczego taki wynik w tym punkcie?</div>
             <div id="diagnosis-factors" class="diagnosis-factors"></div>
             <div class="diagnosis-note">
-              💡 <strong>Wskazówka taktyczna:</strong> Heatmapa na mapie odzwierciedla wiek i gatunki poszczególnych wydzieleń LP. Jeśli jesteś w młodej uprawie lub suchym borze, przejdź kilkaset metrów do sąsiedniego starodrzewu (40–100 lat) na siedlisku świeżym (BŚW/BMŚW).
+              💡 <strong data-i18n="diagnosisTacticalTipTitle">Wskazówka taktyczna:</strong> <span data-i18n="diagnosisTacticalTipText">Heatmapa na mapie odzwierciedla wiek i gatunki poszczególnych wydzieleń LP. Jeśli jesteś w młodej uprawie lub suchym borze, przejdź kilkaset metrów do sąsiedniego starodrzewu (40–100 lat) na siedlisku świeżym (BŚW/BMŚW).</span>
             </div>
           </div>
         </div>
@@ -213,16 +230,16 @@
 
       <!-- Sekcja: Grzyby -->
       <section class="section" aria-labelledby="section-mushrooms-title">
-        <div class="section-title" id="section-mushrooms-title">🍄 Spodziewane gatunki</div>
+        <div class="section-title" id="section-mushrooms-title" data-i18n="secMushroomsTitle">🍄 Spodziewane gatunki</div>
         <div id="mushroom-list">
-          <p class="no-data">Brak danych — włącz lokalizację</p>
+          <p class="no-data" data-i18n="weatherNoData">Brak danych — włącz lokalizację</p>
         </div>
       </section>
 
       <!-- Stopka -->
       <footer style="padding: 12px 0 8px; text-align: center; color: var(--text-muted); font-size: 11px; line-height: 1.6;">
-        Dane: Lasy Państwowe BDL · GBIF · Open-Meteo<br>
-        ⚠️ Nigdy nie jedz grzyba bez 100% pewności co do gatunku.
+        <span data-i18n="footerNote">Dane: Lasy Państwowe BDL · GBIF · Open-Meteo</span><br>
+        <span data-i18n="footerWarning">⚠️ Nigdy nie jedz grzyba bez 100% pewności co do gatunku.</span>
       </footer>
 
     </div><!-- /panel-scroll -->
@@ -239,7 +256,7 @@
 
 
 <!-- Główna aplikacja (ES modules) -->
-<script type="module" src="js/app.js?v=12.0"></script>
+<script type="module" src="js/app.js?v=13.0"></script>
 
 <!-- Service Worker Cache Purge & Register -->
 <script>
